@@ -273,7 +273,7 @@ Outputs: `npvBuy`, `npvBuild`, `npvAdvantage`, `breakEvenMonth`, per-token serie
 (including the intuition-only straight-line amortized all-in), Token Yield series, melt
 analytics, min viable scale, D_max, tornado (±30% one-at-a-time).
 
-**Verification** (`node dashboard/verify.mjs`, 13 checks, all machine-precision):
+**Verification** (`node dashboard/verify.mjs`, 23 checks, all machine-precision):
 A. constant world vs exact closed form; B. exponential world vs exact geometric sums;
 C. t* closed form vs bisection; D. glacier value vs independent sum; E. `D_max` identity;
 F. staged ≤ upfront and staged-covers-demand invariants; plus σ-equivalence

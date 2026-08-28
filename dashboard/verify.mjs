@@ -113,5 +113,30 @@ const check = (name, got, want, tol) => {
   check('G sigma equivalence', a.npvAdvantage, b.npvAdvantage, 1e-12);
 }
 
+// ---- Vectors H: cross-check against the adversarially reviewed canonical spec
+// (docs/canonical-spec.md §8.4) — computed by an independent reference
+// implementation and verified through the hostile-review loop.
+{
+  const BASE = { ...G.DEFAULTS, kappa: 1.2, s0: 800, u: 0.6, wKw: 1.2, pue: 1.3, e0: 0.12,
+    h: 30000, sigma: 1, comparator: 'frontier', fleetMode: 'upfront', lambdaOpen: 0 };
+  const A = G.simulate({ ...BASE, Tyears: 2, r: 0, Q0m: 10000, g: 0, p0: 4, lambda: 0,
+    gamma: 0, mu: 0, delta: 0.25, D: 120000, mYr: 96000 });
+  check('H-A npvBuy', A.npvBuy, 960000, 1e-12);
+  check('H-A npvBuild', A.npvBuild, 462860.706, 1e-8);
+  check('H-A breakEven', A.breakEvenMonth, 13, 0);
+  const B = G.simulate({ ...BASE, Tyears: 3, r: 0.10, Q0m: 10000, g: 0, p0: 4,
+    lambda: 0.6931, gamma: 0.05, mu: 0, delta: 0.25, D: 120000, mYr: 60000 });
+  check('H-B npvBuy', B.npvBuy, 567514.917, 1e-8);
+  check('H-B npvBuild', B.npvBuild, 516987.412, 1e-8);
+  check('H-B breakEven', B.breakEvenMonth, 35, 0);
+  const CP = { ...BASE, Tyears: 3, r: 0.10, Q0m: 1500, g: 0, p0: 1.5, lambda: 1.0,
+    gamma: 0.15, mu: 0, delta: 0.35, D: 200000, mYr: 60000, fleetMode: 'manual', N: 1 };
+  const C = G.simulate(CP);
+  check('H-C npvBuy', C.npvBuy, 24740.1981, 1e-8);
+  check('H-C npvBuild', C.npvBuild, 391071.433, 1e-8);
+  check('H-C tStar', G.meltTime(CP).tStar, 2.12668, 1e-5);
+  check('H-C overflow ref tok/mo', C.rows[0].overflowRef * 1e6, 4.48080e8, 1e-5);
+}
+
 console.log(fails === 0 ? '\nALL CHECKS PASS' : `\n${fails} CHECKS FAILED`);
 process.exit(fails === 0 ? 0 : 1);

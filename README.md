@@ -28,7 +28,7 @@ melt clock on your savings.
 | [`docs/glacier-math.md`](docs/glacier-math.md) | **The nerd version** — full derivations, closed forms, melt time, glacier value, two gates, force vectors, calibration, worked examples. |
 | [`docs/glacier-math.tex`](docs/glacier-math.tex) | Same, as a LaTeX working paper. |
 | [`docs/glacier-plain.md`](docs/glacier-plain.md) | **The easy version** — the whole model as one glacier story, no equations. |
-| [`dashboard/verify.mjs`](dashboard/verify.mjs) | Verification: extracts the engine from `index.html` and checks it against exact closed forms (13 checks, machine precision). |
+| [`dashboard/verify.mjs`](dashboard/verify.mjs) | Verification: extracts the engine from `index.html` and checks it against exact closed forms (23 checks, machine precision, incl. cross-checks against the reviewed canonical spec). |
 | [`docs/calibration-data.md`](docs/calibration-data.md) | **Sourced calibration** — Aug-2026 low/central/high for every parameter with per-bound citations, from a 6-agent web sweep. |
 | [`docs/enterprise-examples.md`](docs/enterprise-examples.md) | **Reproducible enterprise archetypes** (Microsoft Foundry cohort, Salesforce-scale, Klarna-shape, Roblox-shape) run through the engine. |
 | [`docs/paper-audit.md`](docs/paper-audit.md) + [`dashboard/audit-twogates.mjs`](dashboard/audit-twogates.mjs) | Audit of the companion papers: 17/17 claims reproduce; 2 wording defects found and corrected in place. |
