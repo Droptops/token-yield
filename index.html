@@ -272,25 +272,26 @@
 
       <div class="ctl-group">
         <h3>Token prices</h3>
-        <div class="ctl"><label for="in-p0">Frontier $/M tokens <span class="sym">p₀</span></label><input id="in-p0" type="number" min="0" step="any" value="5"></div>
+        <div class="ctl"><label for="in-p0">Frontier $/M tokens <span class="sym">p₀</span></label><input id="in-p0" type="number" min="0" step="any" value="4.25"></div>
         <div class="ctl"><label for="in-half">Price halving time</label>
           <select id="in-half">
             <option value="0.5">6 mo</option>
-            <option value="1" selected>12 mo</option>
+            <option value="1">12 mo</option>
+            <option value="1.5" selected>18 mo</option>
             <option value="2">24 mo</option>
             <option value="99">frozen</option>
           </select>
         </div>
-        <div class="ctl nerd-only"><label for="in-lambda">Melt rate /yr <span class="sym">λ</span></label><input id="in-lambda" type="number" step="any" value="0.693"></div>
-        <div class="ctl nerd-only"><label for="in-pOpen0">Hosted open $/M <span class="sym">p₀ᵒ</span></label><input id="in-pOpen0" type="number" min="0" step="any" value="0.50"></div>
-        <div class="ctl nerd-only"><label for="in-lambdaOpen">Open melt /yr <span class="sym">λᵒ</span></label><input id="in-lambdaOpen" type="number" step="any" value="0.693"></div>
+        <div class="ctl nerd-only"><label for="in-lambda">Melt rate /yr <span class="sym">λ</span></label><input id="in-lambda" type="number" step="any" value="0.462"></div>
+        <div class="ctl nerd-only"><label for="in-pOpen0">Hosted open $/M <span class="sym">p₀ᵒ</span></label><input id="in-pOpen0" type="number" min="0" step="any" value="0.30"></div>
+        <div class="ctl nerd-only"><label for="in-lambdaOpen">Open melt /yr <span class="sym">λᵒ</span></label><input id="in-lambdaOpen" type="number" step="any" value="0.462"></div>
         <div class="ctl nerd-only"><label for="in-kappa">Quality multiplier <span class="sym">κ</span></label><input id="in-kappa" type="number" min="0.5" step="any" value="1.15"></div>
       </div>
 
       <div class="ctl-group">
         <h3>Power chips</h3>
-        <div class="ctl"><label for="in-h">$ per GPU, all-in <span class="sym">h</span></label><input id="in-h" type="number" min="0" step="any" value="32000"></div>
-        <div class="ctl"><label for="in-s0">Tokens/sec per GPU <span class="sym">s₀</span></label><input id="in-s0" type="number" min="1" step="any" value="600"></div>
+        <div class="ctl"><label for="in-h">$ per GPU, all-in <span class="sym">h</span></label><input id="in-h" type="number" min="0" step="any" value="45000"></div>
+        <div class="ctl"><label for="in-s0">Tokens/sec per GPU <span class="sym">s₀</span></label><input id="in-s0" type="number" min="1" step="any" value="1000"></div>
         <div class="ctl"><label for="in-u">Utilization % <span class="sym">u</span></label><input id="in-u" type="number" min="1" max="100" step="any" value="50"></div>
         <div class="ctl nerd-only"><label for="in-mu">Efficiency gain %/yr <span class="sym">μ</span></label><input id="in-mu" type="number" step="any" value="25"></div>
         <div class="ctl nerd-only"><label for="in-fleet">Fleet strategy</label>
@@ -301,7 +302,7 @@
           </select>
         </div>
         <div class="ctl nerd-only"><label for="in-N">GPU count (manual) <span class="sym">N</span></label><input id="in-N" type="number" min="1" step="1" value="8"></div>
-        <div class="ctl nerd-only"><label for="in-delta">Resale decay %/yr <span class="sym">δ</span></label><input id="in-delta" type="number" step="any" value="45"></div>
+        <div class="ctl nerd-only"><label for="in-delta">Resale decay %/yr <span class="sym">δ</span></label><input id="in-delta" type="number" step="any" value="30"></div>
       </div>
 
       <div class="ctl-group">
@@ -315,7 +316,7 @@
       <div class="ctl-group">
         <h3>People</h3>
         <div class="ctl"><label for="in-D">Dev cost, one-time $ <span class="sym">D</span></label><input id="in-D" type="number" min="0" step="any" value="250000"></div>
-        <div class="ctl"><label for="in-mYr">MLOps $/yr <span class="sym">m</span></label><input id="in-mYr" type="number" min="0" step="any" value="240000"></div>
+        <div class="ctl"><label for="in-mYr">MLOps $/yr <span class="sym">m</span></label><input id="in-mYr" type="number" min="0" step="any" value="450000"></div>
       </div>
 
       <div class="ctl-group">
@@ -436,16 +437,16 @@ const GLACIER = (() => {
     Q0m: 5000,        // reference demand at t=0 (Mtok/month)
     sigma: 1.0,       // movable share of the workload (open models can handle it)
     g: 0.40,          // demand growth (/yr, continuous)
-    p0: 5.0,          // frontier API blended price ($/Mtok reference)
-    lambda: 0.693,    // frontier price decline (/yr) = 12-month halving
-    pOpen0: 0.50,     // hosted open-weight price ($/Mtok OPEN tokens)
-    lambdaOpen: 0.693,// hosted open-weight price decline (/yr)
+    p0: 4.25,         // frontier workhorse-tier blended price ($/Mtok reference)
+    lambda: 0.462,    // frontier list-price decline (/yr) = 18-month halving
+    pOpen0: 0.30,     // hosted open-weight commodity tier ($/Mtok OPEN tokens)
+    lambdaOpen: 0.462,// hosted open-weight price decline (/yr)
     kappa: 1.15,      // open-model quality multiplier (open tokens per reference token)
     comparator: 'frontier',  // 'frontier' | 'hostedOpen'
     fleetMode: 'staged',     // 'staged' | 'upfront' | 'manual'
     N: 8,             // GPU count when fleetMode='manual'
-    h: 32000,         // all-in $ per GPU slot (card + server share + install)
-    s0: 600,          // effective output tok/s per GPU at t=0
+    h: 45000,         // all-in $ per GPU slot (server share + fabric + integration)
+    s0: 1000,         // effective output tok/s per GPU at t=0 (chat-SLO, 2026 stack)
     mu: 0.25,         // serving+model efficiency gain on owned hardware (/yr)
     u: 0.50,          // utilization (busy fraction of powered time)
     wKw: 1.3,         // server kW per GPU slot (powered whenever on)
@@ -453,8 +454,8 @@ const GLACIER = (() => {
     e0: 0.11,         // electricity price ($/kWh)
     gamma: 0.06,      // electricity escalation (/yr)
     D: 250000,        // one-time dev/integration cost ($)
-    mYr: 240000,      // ongoing MLOps + maintenance ($/yr)
-    delta: 0.45,      // hardware value decay (/yr)
+    mYr: 450000,      // ongoing MLOps + maintenance ($/yr, ~1 loaded FTE)
+    delta: 0.30,      // hardware value decay (/yr; 0.45 = stress branch)
     vRef: 20,         // value realized per reference Mtok ($/Mtok), Token Yield view
   };
 
@@ -659,9 +660,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
   const state = { ...GLACIER.DEFAULTS };
 
   const PRESETS = {
-    startup:    { Q0m: 200,   g: 0.60, D: 150000, mYr: 120000 },
-    scaleup:    { Q0m: 5000,  g: 0.40, D: 250000, mYr: 240000 },
-    enterprise: { Q0m: 50000, g: 0.25, D: 400000, mYr: 480000 },
+    startup:    { Q0m: 200,   g: 0.60, D: 150000, mYr: 240000 },
+    scaleup:    { Q0m: 5000,  g: 0.40, D: 250000, mYr: 450000 },
+    enterprise: { Q0m: 50000, g: 0.25, D: 400000, mYr: 900000 },
   };
 
   // [inputId, stateKey, scale] — UI percent fields scale by 0.01

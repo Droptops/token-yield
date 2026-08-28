@@ -10,9 +10,9 @@ read [When Open Source Gets Cheap Enough](https://claude.ai/code/artifact/40c001
 
 ## The picture
 
-Every million tokens you buy from an AI company costs you something — say $5 today. Every
+Every million tokens you buy from an AI company costs you something — say $4 today. Every
 million tokens you could serve on your own machines costs you something much smaller in
-electricity — say 20 cents. The gap between those two numbers is a **glacier of savings**:
+electricity — say 10 cents. The gap between those two numbers is a **glacier of savings**:
 thick today, and yours to harvest if you show up with the right equipment.
 
 But this glacier is melting.
@@ -48,9 +48,9 @@ gate is about *volume*, and it's brutal.
 
 The trap — and most mid-sized companies are standing in it — is passing Gate 1 and
 failing Gate 2. Real margin on every token, and still not enough tokens for the margin to
-pay for the machine that makes it. Our worked example: a company spending $25k/month on
-tokens has a savings glacier worth about $480k over three years… against a toll of about
-$1.1M. Clear margin, clear no.
+pay for the machine that makes it. Our worked example: a company spending $21k/month on
+tokens has a savings glacier worth about $570k over three years… against a toll of about
+$1.6M. Clear margin, clear no.
 
 As a rule of thumb from our defaults: self-hosting starts to pay somewhere around **15–20
 billion tokens a month** — a serious AI product, not a feature. Below that, keep buying
@@ -64,7 +64,7 @@ were about to buy machines for** — at prices that are already close to bare el
 cost, and falling just as fast.
 
 Beating the frontier API isn't the real bar. Beating the *rented open model* is, and in
-our numbers even a company with a $250k/month token bill loses that comparison by
+our numbers even a company with a $200k+/month token bill loses that comparison by
 millions. Renting shares one set of machines across hundreds of customers, so their
 utilization beats yours. You only clear this bar when APIs are off the table — your data
 can't leave, regulators are watching, latency has to be local — or when your machines run
@@ -78,7 +78,7 @@ presses gently.**
 Power is only a few percent of what running your own AI machines really costs — the chips
 and the people are the big money. Electricity going up 6% a year drags your token yield
 (the value you get per dollar of token spend) down by a fraction of a percent a year.
-Meanwhile falling API prices push a token *buyer's* yield up by around 70% a year. Those
+Meanwhile falling API prices push a token *buyer's* yield up by around 60% a year. Those
 two forces are not in the same weight class. The price of power will never decide this
 question for you.
 
@@ -102,7 +102,7 @@ migrate) is in [Two Gates and a Half-Life](https://claude.ai/code/artifact/aaa96
 - **You're small or mid-sized** (under ~15B tokens/month): buy. Revisit yearly; the
   thresholds move.
 - **You're big and your workload is steady** (high utilization, batch-heavy): the frontier
-  comparison can favor building within ~2 years — check the hosted-open comparison before
+  comparison can favor building within about three years — check the hosted-open comparison before
   signing anything.
 - **Your data can't leave the building**: build — but knowingly, as a compliance cost, not
   as a savings play the arithmetic doesn't support.

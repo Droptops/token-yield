@@ -117,13 +117,13 @@ workload and stretches the sector half-life from $4.0$ to $5.9$ years).
 
 \section{Force vectors on Token Yield}
 Token Yield is $y=v/\text{cost}$. Buying: $d\ln y_{\mathrm{buy}}/dt=+\lambda_c$
-($\approx69\%/$yr at central calibration). Building, with electricity share
+($\approx46\%/$yr at central calibration). Building, with electricity share
 $s_E(t)$ of all-in cost:
 \begin{equation}
 \frac{d\ln y_{\mathrm{build}}}{dt}=(\mu-\gamma)\,s_E(t)\;+\;\text{(fixed-cost dilution)}.
 \end{equation}
 The \emph{downward force vector} of rising electricity is $\gamma s_E \approx
-0.2$--$0.5\%$/yr at $s_E=3.7$--$8.5\%$, $\gamma=6\%$/yr: real, compounding, and two orders
+0.1$--$0.3\%$/yr at $s_E=1.7$--$4.6\%$, $\gamma=6\%$/yr: real, compounding, and two orders
 of magnitude smaller than the buyer's tailwind $\lambda_c$. Electricity \emph{price} nibbles
 the decision; electricity \emph{capacity} can veto it: in the power-limited regime the
 companion calibration gives $\partial\ln Y/\partial\ln e=-s_e\approx-0.085$ against
@@ -131,11 +131,13 @@ $\partial\ln Y/\partial\ln E_{\mathrm{delivered}}=+1/\epsilon$, a $4$--$24\times
 channel. Watch the megawatts, not the \$/kWh.
 
 \section{Calibration (August 2026, knowledge-based)}
-$h=\$32$k/slot, $w=1.3$ kW, $\varphi=1.3$, $s_0=600$ tok/s, $u=0.5$, $\mu=0.25$,
-$e_0=\$0.11$/kWh, $\gamma=0.06$, $p_0=\$5$/Mtok, $\lambda=0.693$ (12-month halving),
-$p_{o0}=\$0.50$/Mtok, $\kappa=1.15$, $D=\$250$k, $m=\$240$k/yr, $\delta=0.45$, $r=0.12$,
-$T=3$ yr. Then $\varepsilon_0=\$0.172$/M open tokens; against the frontier,
-$t^\ast=6.4$ yr; against hosted open-weights, $t^\ast=2.1$ yr.
+$h=\$45$k/slot, $w=1.3$ kW, $\varphi=1.3$, $s_0=1000$ tok/s, $u=0.5$, $\mu=0.25$,
+$e_0=\$0.11$/kWh, $\gamma=0.06$, $p_0=\$4.25$/Mtok (workhorse tier), $\lambda=0.462$
+(18-month halving, list-price regime), $p_{o0}=\$0.30$/Mtok (commodity hosted-open),
+$\kappa=1.15$, $D=\$250$k, $m=\$450$k/yr, $\delta=0.30$, $r=0.12$,
+$T=3$ yr. Then $\varepsilon_0=\$0.103$/M open tokens; against the frontier,
+$t^\ast=13.2$ yr; against hosted open-weights, $t^\ast=3.9$ yr. Per-bound sourcing:
+\texttt{docs/calibration-data.md}.
 
 \begin{table}[h]\centering\small
 \begin{tabular}{lrrrr}
@@ -144,16 +146,16 @@ $t^\ast=6.4$ yr; against hosted open-weights, $t^\ast=2.1$ yr.
  & vs frontier & vs hosted-open & vs frontier & vs hosted-open\\
 \midrule
 Gate 1 (margin) & pass & pass & pass & pass\\
-Glacier $G$ & \$484k & \$22k & \$4.12M & \$200k\\
-Toll & \$1.12M & \$1.12M & \$3.53M & \$3.53M\\
+Glacier $G$ & \$570k & \$24k & \$4.71M & \$203k\\
+Toll & \$1.58M & \$1.58M & \$4.10M & \$4.10M\\
 Gate 2 (participation) & fail & fail & \textbf{pass} & fail\\
-$\mathrm{NPV_{adv}}$ & $-\$636$k & $-\$1.10$M & $+\$591$k & $-\$3.34$M\\
-Break-even & never & never & month 27 & never\\
+$\mathrm{NPV_{adv}}$ & $-\$1.02$M & $-\$1.56$M & $+\$617$k & $-\$3.90$M\\
+Break-even & never & never & month 33 & never\\
 \bottomrule
 \end{tabular}
-\caption{Engine output at central calibration ($g=40\%$, $D=\$250$k, $m=\$240$k for the
-scaleup; $g=25\%$, $D=\$400$k, $m=\$480$k for the enterprise). Minimum viable scale vs the
-frontier is $\approx18$B movable tokens/month (scaleup settings) to $\approx37$B
+\caption{Engine output at central calibration ($g=40\%$, $D=\$250$k, $m=\$450$k for the
+scaleup; $g=25\%$, $D=\$400$k, $m=\$900$k for the enterprise). Minimum viable scale vs the
+frontier is $\approx18$B movable tokens/month (scaleup settings) to $\approx41$B
 (enterprise settings); vs hosted open-weights no scale suffices at central utilization.}
 \end{table}
 

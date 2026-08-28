@@ -121,7 +121,7 @@ tokens. Therefore
 ```
 
 Dimensional check: `kW·(kWh/kW·h)·($/kWh) / (tok/h) = $/tok`. At central defaults
-(`w=1.3, φ=1.3, e₀=$0.11, s₀=600 tok/s, u=0.5`): **ε₀ = $0.172 per million open tokens**
+(`w=1.3, φ=1.3, e₀=$0.11, s₀=1000 tok/s, u=0.5`): **ε₀ = $0.103 per million open tokens**
 — matching the engine's `epsilon0()` exactly. Electricity moves at net rate `γ − μ`:
 escalation pushes up, efficiency on your own metal pushes down.
 
@@ -146,7 +146,7 @@ Break-even month: first `i` where cumulative discounted BUY ≥ cumulative disco
 - **Max dev cost.** D enters additively: `D_max = D + NPV_adv`. (Vector E: exact.)
 - **Min viable scale.** `NPV_adv(Q₀)` is increasing and step-wise (integer GPUs); the
   engine log-bisects to the threshold `Q₀_min`. At central defaults vs the frontier API:
-  **≈ 18.3 B movable tokens/month**. Against hosted open-weights: **no scale suffices**
+  **≈ 18 B movable tokens/month**. Against hosted open-weights: **no scale suffices**
   (see §10 — the capex per token alone exceeds the hosted margin).
 - **Break-even horizon** `T_be` solves `NPV_adv(T) = 0`; generally a root-find. Special
   case `g = 0, γ = μ, λ_c = 0`: linear-in-T closed form
@@ -176,8 +176,8 @@ t* = ln( c₀ / (κ·ε₀) ) / (λ_c + γ − μ)
 | already melted | `c₀ ≤ κε₀`, `λ_c+γ−μ ≥ 0` | buying is cheaper per token from day one |
 | opens later | `c₀ ≤ κε₀`, `λ_c+γ−μ < 0` | margin negative now, turns positive at t* < 0 formula's root |
 
-Central defaults vs frontier: `t* = ln(5/0.198)/0.503 = 6.42 yr`. Vs hosted open-weights:
-`t* = ln(0.5/0.172)/0.503 = 2.12 yr`. (Vector C: closed form matches bisection to 1e-6.)
+Central defaults vs frontier: `t* = ln(4.25/0.119)/0.272 = 13.2 yr`. Vs hosted open-weights:
+`t* = ln(0.30/0.103)/0.272 = 3.92 yr`. (Vector C: closed form matches bisection to 1e-6.)
 
 **Glacier value (the harvestable volume).** Over `τ = min(T, t*)`:
 
@@ -192,7 +192,7 @@ exact agreement), which also handles the sign cases without case analysis.
 
 **The decision rule restated.** `BUILD ⟺ G ≥ toll`, where
 `toll = D + PV(capex) + PV(m) − PV(salvage)`. G excludes fixed costs by construction;
-the toll collects all of them. At scaleup defaults: G = $484k vs toll = $1.12M — **Gate 2
+the toll collects all of them. At scaleup defaults: G = $570k vs toll = $1.58M — **Gate 2
 fails while Gate 1 passes.**
 
 ## 7. Two gates, and the sector behind them
@@ -224,7 +224,7 @@ This model's two gates are the cash-flow instantiation of *Two Gates and a Half-
 
 Token Yield `y = v / (cost per Mtok)`, value realized per dollar of token spend.
 
-**Buying:** `d ln y_buy/dt = +λ_c`. At λ = 0.69/yr, the buyer's yield doubles yearly for
+**Buying:** `d ln y_buy/dt = +λ_c`. At λ = 0.46/yr (18-month halving), the buyer's per-dollar yield rises ~59%/yr for
 free. This is the down-escalator the build case races against.
 
 **Building:** all-in cost = amortization (fixed) + MLOps (fixed) + electricity (moving at
@@ -235,9 +235,9 @@ d ln y_build/dt = (μ − γ)·s_E(t) + (growth dilution of fixed costs)
 ```
 
 **The downward force vector, quantified.** Rising electricity drags build-side yield at
-rate `γ·s_E`. At central defaults `s_E ≈ 3.7%` (scaleup) to `8.5%` (enterprise), γ = 6%/yr:
-**the drag is 0.2–0.5%/yr**. It is real, it compounds, and it is *two orders of magnitude
-smaller* than the λ ≈ 69%/yr tailwind the buyer rides. Electricity **price** cannot decide
+rate `γ·s_E`. At central defaults `s_E ≈ 1.7%` (scaleup) to `4.6%` (enterprise), γ = 6%/yr:
+**the drag is 0.1–0.3%/yr**. It is real, it compounds, and it is *two orders of magnitude
+smaller* than the λ ≈ 46%/yr tailwind the buyer rides. Electricity **price** cannot decide
 this decision; it can only nibble it.
 
 **Where electricity actually bites** (from *From Delivered Power to Token Price*, s_e ≈
@@ -279,57 +279,58 @@ C. t* closed form vs bisection; D. glacier value vs independent sum; E. `D_max` 
 F. staged ≤ upfront and staged-covers-demand invariants; plus σ-equivalence
 (`σ=0.5 ≡ Q₀/2`).
 
-## 10. Default parameters (Aug 2026, knowledge-based — verify before deciding)
+## 10. Default parameters (Aug 2026 — sourced; per-bound citations in [calibration-data.md](calibration-data.md))
 
 | Param | Low | Central | High | Note |
 |---|---|---|---|---|
-| `h` $/GPU slot | 22,000 | **32,000** | 45,000 | H100-class all-in incl. server share; B200-class at the high end |
+| `h` $/GPU slot | 37,000 | **45,000** | 55,000 | H100-class all-in incl. server share, fabric, integration; B200 tier $58–85k |
 | `w` kW/slot | 1.0 | **1.3** | 1.6 | 8-GPU HGX ≈ 10.2 kW ⇒ ~1.3/slot |
 | `φ` PUE | 1.15 | **1.3** | 1.5 | hyperscale low, retail colo high |
-| `s₀` tok/s/GPU | 250 | **600** | 2,500 | 70B-dense latency-bound low; MoE/batch-heavy high |
+| `s₀` tok/s/GPU | 300 | **1,000** | 2,600 | 70B-dense strict-SLO low; MoE wide-EP / offline high |
 | `u` | 0.3 | **0.5** | 0.8 | peaky SaaS low; batch pipelines high |
 | `μ` /yr | 0.10 | **0.25** | 0.50 | serving-stack + open-model gains on fixed hardware |
 | `e₀` $/kWh | 0.07 | **0.11** | 0.16 | US industrial→commercial; colo all-in equivalent higher |
 | `γ` /yr | 0.03 | **0.06** | 0.10 | 2024–26 escalation, datacenter-heavy regions high |
-| `p₀` $/Mtok | 2 | **5** | 12 | frontier blended in/out |
-| `λ` /yr | 0.35 | **0.69** | 1.4 | 24-, 12-, 6-month halving; fixed-capability declines run faster than frontier-tier |
-| `p_o₀` $/Mtok | 0.2 | **0.5** | 1.0 | hosted open-weight, strong open model |
+| `p₀` $/Mtok | 4.00 | **4.25** (workhorse) / 10 (flagship) | 11.25 | frontier blended 3:1; pick tier AND its matching λ |
+| `λ` /yr | 0.2 | **0.462** (18-mo halving, list-price regime) | 1.0 | fixed-capability regime runs λ≈2.3 (10×/yr) — only valid with a fixed-task p₀ |
+| `p_o₀` $/Mtok | 0.23 | **0.30** (commodity) / 2.00 (best-open) | 2.20 | hosted open-weight, per tier |
 | `κ` | 1.0 | **1.15** | 1.5 | workload-dependent; agentic chains worse |
 | `D` $ | 100k | **250k** | 600k | 1–3 eng × 3–6 mo loaded |
-| `m` $/yr | 120k | **240k** | 600k | 0.5–2 FTE + tooling |
-| `δ` /yr | 0.30 | **0.45** | 0.60 | GPU resale decay (A100 history) |
+| `m` $/yr | 240k | **450k** | 2M | ~0.5–1 loaded FTE central; 4–5-eng platform team high |
+| `δ` /yr | 0.15 | **0.30** | 0.50 | secondary-market decay (A100/H100 history); 0.45+ = stress branch |
 | `r` /yr | 0.08 | **0.12** | 0.20 | WACC-ish |
 | `g` /yr | 0 | **0.25–0.60** | 1.0 | archetype-dependent |
 
-Sanity: `ε₀ = $0.172/M open tok` at central values — far below hosted-open prices
-($0.2–1.0/M), i.e. electricity is a small share of serving cost; capex + people dominate.
+Sanity: `ε₀ = $0.103/M open tok` at central values — below even commodity hosted-open
+prices ($0.23–0.39/M), i.e. electricity is a small share of serving cost; capex + people dominate.
 Consistent with the companion's s_e ≈ 0.085 at the provider level.
 
 ## 11. Worked examples (engine output, `scratchpad → verify.mjs` reproducible)
 
-**Scaleup** — 5 B movable tok/mo, g=40%/yr, D=$250k, m=$240k/yr, T=3, r=12%:
+**Scaleup** — 5 B movable tok/mo, g=40%/yr, D=$250k, m=$450k/yr, T=3, r=12%:
 
-| vs Frontier ($5/M, 12-mo halving) | vs Hosted open ($0.50/M·κ) |
+| vs Frontier ($4.25/M, 18-mo halving) | vs Hosted open ($0.30/M·κ) |
 |---|---|
-| Gate 1 **PASS**: t* = 6.4 yr | Gate 1 PASS: t* = 2.1 yr |
-| Gate 2 **FAIL**: G = $484k < toll = $1.12M | Gate 2 FAIL: G = $22k ≪ $1.12M |
-| NPV_adv = **−$636k** · break-even: never | NPV_adv = −$1.10M |
-| Min viable scale ≈ 18.3 B tok/mo | no scale suffices |
+| Gate 1 **PASS**: t* = 13.2 yr | Gate 1 PASS: t* = 3.9 yr |
+| Gate 2 **FAIL**: G = $570k < toll = $1.58M | Gate 2 FAIL: G = $24k ≪ $1.58M |
+| NPV_adv = **−$1.02M** · break-even: never | NPV_adv = −$1.56M |
+| Min viable scale ≈ 18 B tok/mo | no scale suffices |
 
-The mid-size trap, exactly: the margin is open for 6+ years, and it still can't pay a
-$1.1M toll out of a $25k/month API bill.
+The mid-size trap, exactly: the margin is open for 13 years, and it still can't pay a
+$1.6M toll out of a $21k/month API bill.
 
-**Enterprise** — 50 B movable tok/mo, g=25%/yr, D=$400k, m=$480k/yr:
+**Enterprise** — 50 B movable tok/mo, g=25%/yr, D=$400k, m=$900k/yr:
 
 | vs Frontier | vs Hosted open |
 |---|---|
-| Gate 1 PASS · Gate 2 **PASS**: G = $4.12M > toll = $3.53M | Gate 2 FAIL: G = $200k |
-| NPV_adv = **+$591k** · break-even month 27 · fleet grows to 73 GPUs | NPV_adv = −$3.34M |
+| Gate 1 PASS · Gate 2 **PASS**: G = $4.71M > toll = $4.10M | Gate 2 FAIL: G = $203k |
+| NPV_adv = **+$617k** · break-even month 33 · fleet grows to 44 GPUs | NPV_adv = −$3.90M |
 
 Verdict: **it depends** — building beats the frontier API, but *renting the same open
-model* beats building by $3.3M. Self-hosting only wins outright when APIs are off the
+model* beats building by $3.9M. Self-hosting only wins outright when APIs are off the
 table (data residency, compliance, latency) or when your utilization and throughput reach
-provider grade (`u → 0.8, s₀ → 2,500` flips it — try it in the dashboard).
+provider grade (`u → 0.8, s₀ → 2,000` flips it — try it in the dashboard). Four sourced real-world
+archetypes are run through the engine in [enterprise-examples.md](enterprise-examples.md).
 
 ## 12. Limitations
 
