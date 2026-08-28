@@ -32,6 +32,7 @@ melt clock on your savings.
 | [`docs/calibration-data.md`](docs/calibration-data.md) | **Sourced calibration** — Aug-2026 low/central/high for every parameter with per-bound citations, from a 6-agent web sweep. |
 | [`docs/enterprise-examples.md`](docs/enterprise-examples.md) | **Reproducible enterprise archetypes** (Microsoft Foundry cohort, Salesforce-scale, Klarna-shape, Roblox-shape) run through the engine. |
 | [`docs/paper-audit.md`](docs/paper-audit.md) + [`dashboard/audit-twogates.mjs`](dashboard/audit-twogates.mjs) | Audit of the companion papers: 17/17 claims reproduce; 2 wording defects found and corrected in place. |
+| [`docs/canonical-spec.md`](docs/canonical-spec.md) | The machine-verified derivation appendix: 4 independent derivations synthesized, 3 hostile-review rounds of fixes applied, every closed form numerically verified; the dashboard engine reproduces its test vectors exactly. |
 | [`dashboard/engine.dev.js`](dashboard/engine.dev.js) | Development copy of the engine (the canonical copy is inlined in `index.html`). |
 
 ```bash
