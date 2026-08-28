@@ -1,0 +1,1145 @@
+<title>The Glacier Model</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    /* ground */
+    --page: #F7F9FA;          /* house ground */
+    --surface: #FFFFFF;       /* cards + chart surface (house panel) */
+    --surface-2: #EDF2F5;     /* inset wells (house panel-2) */
+    --ink: #0D1418;
+    --ink-2: #41525B;
+    --muted: #7E9099;
+    --grid: #E4EBEF;
+    --baseline: #D3DEE4;
+    --border: #D3DEE4;
+    --accent: #2a78d6;        /* glacier blue */
+    --accent-soft: rgba(42, 120, 214, 0.12);
+    /* series (validated, see dataviz notes in repo) */
+    --s-build: #2a78d6;       /* BUILD = ice blue */
+    --s-frontier: #eb6834;    /* frontier API = the sun */
+    --s-open: #1baf7a;        /* hosted open-weights */
+    /* status (fixed) */
+    --st-good: #0ca30c; --st-good-text: #006300;
+    --st-warn: #fab219; --st-serious: #ec835a; --st-critical: #d03b3b;
+    --shadow: 0 1px 2px rgba(13,20,24,.04), 0 4px 16px rgba(13,20,24,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0D1418;
+      --surface: #141E24;
+      --surface-2: #1B282F;
+      --ink: #E8EFF2;
+      --ink-2: #A3B6BF;
+      --muted: #7E9099;
+      --grid: #223038;
+      --baseline: #2A3B44;
+      --border: #2A3B44;
+      --accent: #3987e5;
+      --accent-soft: rgba(57, 135, 229, 0.16);
+      --s-build: #3987e5;
+      --s-frontier: #d95926;
+      --s-open: #199e70;
+      --st-good-text: #0ca30c;
+      --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0D1418;
+    --surface: #141E24;
+    --surface-2: #1B282F;
+    --ink: #E8EFF2;
+    --ink-2: #A3B6BF;
+    --muted: #7E9099;
+    --grid: #223038;
+    --baseline: #2A3B44;
+    --border: #2A3B44;
+    --accent: #3987e5;
+    --accent-soft: rgba(57, 135, 229, 0.16);
+    --s-build: #3987e5;
+    --s-frontier: #d95926;
+    --s-open: #199e70;
+    --st-good-text: #0ca30c;
+    --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 15px/1.55 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1, h2, h3 { font-family: "IBM Plex Sans", system-ui, sans-serif; text-wrap: balance; margin: 0; }
+  .mono, .eq { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 20px 64px; }
+
+  /* ---------- header ---------- */
+  header.site {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+    padding: 22px 0 16px;
+  }
+  .wordmark { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
+  .wordmark .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .wordmark h1 { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; }
+  .wordmark .tag { color: var(--ink-2); font-size: 13.5px; }
+  .seg {
+    display: inline-flex; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 3px; gap: 2px;
+  }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--ink-2);
+    font: 600 13px/1 "IBM Plex Sans", system-ui, sans-serif; letter-spacing: .02em;
+    padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .seg button:focus-visible, .chip:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    appearance: none; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink-2); border-radius: 999px;
+    font: 600 12.5px/1 "IBM Plex Sans", system-ui, sans-serif; padding: 8px 14px;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  /* ---------- layout ---------- */
+  .grid { display: grid; grid-template-columns: 316px 1fr; gap: 20px; align-items: start; }
+  .grid > * { min-width: 0; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } aside.controls { position: static; } }
+
+  /* ---------- controls ---------- */
+  aside.controls {
+    position: sticky; top: 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 16px 16px 8px; max-height: calc(100vh - 32px); overflow: auto;
+  }
+  .ctl-group { border-top: 1px solid var(--border); padding: 12px 0; }
+  .ctl-group:first-child { border-top: 0; padding-top: 0; }
+  .ctl-group > h3 {
+    font-size: 11.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .ctl { display: grid; grid-template-columns: 1fr 104px; align-items: center; gap: 10px; padding: 4px 0; }
+  .ctl label { font-size: 13.5px; color: var(--ink-2); }
+  .ctl label .sym { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .ctl input[type="number"], .ctl select, .ctl input[type="text"] {
+    width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--ink);
+    font: 500 13px/1.2 "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  }
+  .ctl-note { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+  .nerd-only { display: none; }
+  body[data-mode="nerd"] .nerd-only { display: block; }
+  body[data-mode="nerd"] .ctl.nerd-only { display: grid; }
+  body[data-mode="nerd"] .simple-only { display: none; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 20px;
+  }
+  .card > header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .card h2 { font-size: 16.5px; font-weight: 600; }
+  .card .sub { color: var(--ink-2); font-size: 13px; margin-right: auto; }
+  .tbl-toggle {
+    appearance: none; border: 1px solid var(--border); background: transparent; color: var(--ink-2);
+    border-radius: 8px; padding: 5px 10px; font: 600 12px/1 "IBM Plex Sans", sans-serif; cursor: pointer;
+  }
+  .tbl-toggle[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); }
+
+  /* verdict */
+  #verdict { border-left: 6px solid var(--st-good); }
+  #verdict.bad { border-left-color: var(--st-critical); }
+  #verdict.mixed { border-left-color: var(--st-warn); }
+  .verdict-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 6px 14px;
+    font: 700 13px/1 "IBM Plex Sans", sans-serif; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .pill .dot { width: 9px; height: 9px; border-radius: 50%; }
+  #verdict-text { font-size: 16px; }
+  #verdict-note { color: var(--ink-2); font-size: 13.5px; margin-top: 8px; }
+  .gates { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 14px; }
+  .gate { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .gate .g-status { font: 700 11px/1 "IBM Plex Mono", monospace; letter-spacing: .06em; border-radius: 6px; padding: 5px 7px; margin-top: 1px; }
+  .gate.pass .g-status { background: rgba(12,163,12,.13); color: var(--st-good-text); }
+  .gate.fail .g-status { background: rgba(208,59,59,.13); color: var(--st-critical); }
+  .gate .g-body { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--ink-2); }
+  .gate .g-body b { color: var(--ink); font-weight: 600; font-size: 13px; }
+
+  /* KPI row */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 13px 15px;
+  }
+  .kpi .k-label { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+  .kpi .k-value { font: 600 26px/1.15 "IBM Plex Sans", system-ui, sans-serif; margin-top: 3px; }
+  .kpi .k-detail { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+  .kpi .k-value.good { color: var(--st-good-text); }
+  .kpi .k-value.bad { color: var(--st-critical); }
+
+  /* charts */
+  .chart-box { position: relative; }
+  .chart-box svg { display: block; width: 100%; height: auto; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); padding: 4px 2px 0; }
+  .legend .key { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .swatch-line { width: 16px; height: 0; border-top: 3px solid; border-radius: 2px; }
+  .legend .swatch-fill { width: 12px; height: 12px; border-radius: 3px; opacity: .35; }
+  .tip {
+    position: absolute; pointer-events: none; display: none; z-index: 5;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 9px 12px; font-size: 12.5px; min-width: 170px;
+  }
+  .tip .tip-t { color: var(--muted); font-size: 11.5px; margin-bottom: 5px; }
+  .tip .row { display: flex; align-items: center; gap: 8px; padding: 1.5px 0; }
+  .tip .row .key-line { width: 12px; border-top: 3px solid; border-radius: 2px; flex: none; }
+  .tip .row .v { font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; padding-left: 12px; }
+  .tip .row .n { color: var(--ink-2); }
+
+  .eq-strip {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; margin-top: 12px; font-size: 13px; overflow-x: auto;
+  }
+  .eq { white-space: nowrap; font-size: 13px; }
+  .eq sub, .eq sup { font-size: 10px; }
+  .plain-note { color: var(--ink-2); font-size: 13.5px; margin-top: 10px; }
+  body[data-mode="nerd"] .plain-note { display: none; }
+
+  .data-table { display: none; overflow-x: auto; margin-top: 12px; }
+  .data-table.open { display: block; }
+  .data-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .data-table th, .data-table td {
+    text-align: right; padding: 5px 10px; border-bottom: 1px solid var(--grid);
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .data-table th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+  .data-table th:first-child, .data-table td:first-child { text-align: left; }
+
+  footer.site { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  footer.site a { color: var(--accent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .kpi { transition: border-color .15s ease; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="site">
+    <div class="wordmark">
+      <span class="eyebrow">Token Yield &middot; interactive</span>
+      <h1>The Glacier Model</h1>
+      <span class="tag">power chips + token prices + dev cost &rarr; when self-hosting open models beats buying tokens</span>
+    </div>
+    <div class="chips" id="presets" role="group" aria-label="Presets">
+      <button class="chip" data-preset="startup">Startup · 200M tok/mo</button>
+      <button class="chip" data-preset="scaleup" aria-pressed="true">Scaleup · 5B tok/mo</button>
+      <button class="chip" data-preset="enterprise">Enterprise · 50B tok/mo</button>
+    </div>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mode-simple" aria-pressed="true">Plain</button>
+      <button id="mode-nerd" aria-pressed="false">Nerd</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <aside class="controls" aria-label="Model inputs">
+      <div class="ctl-group">
+        <h3>Compare against</h3>
+        <div class="ctl">
+          <label for="in-comparator">Buy path</label>
+          <select id="in-comparator">
+            <option value="frontier">Frontier</option>
+            <option value="hostedOpen">Open, hosted</option>
+          </select>
+        </div>
+        <p class="ctl-note simple-only">“Frontier API” is a top closed model’s price. “Hosted open-weights” is renting the same open model you would self-host — the toughest honest comparison.</p>
+      </div>
+
+      <div class="ctl-group">
+        <h3>Your demand</h3>
+        <div class="ctl"><label for="in-Q0m">Tokens/month, millions <span class="sym">Q₀</span></label><input id="in-Q0m" type="number" min="1" step="any" value="5000"></div>
+        <div class="ctl"><label for="in-g">Demand growth %/yr <span class="sym">g</span></label><input id="in-g" type="number" step="any" value="40"></div>
+        <div class="ctl nerd-only"><label for="in-sigma">Movable share % <span class="sym">&sigma;</span></label><input id="in-sigma" type="number" min="1" max="100" step="any" value="100"></div>
+      </div>
+
+      <div class="ctl-group">
+        <h3>Token prices</h3>
+        <div class="ctl"><label for="in-p0">Frontier $/M tokens <span class="sym">p₀</span></label><input id="in-p0" type="number" min="0" step="any" value="5"></div>
+        <div class="ctl"><label for="in-half">Price halving time</label>
+          <select id="in-half">
+            <option value="0.5">6 mo</option>
+            <option value="1" selected>12 mo</option>
+            <option value="2">24 mo</option>
+            <option value="99">frozen</option>
+          </select>
+        </div>
+        <div class="ctl nerd-only"><label for="in-lambda">Melt rate /yr <span class="sym">λ</span></label><input id="in-lambda" type="number" step="any" value="0.693"></div>
+        <div class="ctl nerd-only"><label for="in-pOpen0">Hosted open $/M <span class="sym">p₀ᵒ</span></label><input id="in-pOpen0" type="number" min="0" step="any" value="0.50"></div>
+        <div class="ctl nerd-only"><label for="in-lambdaOpen">Open melt /yr <span class="sym">λᵒ</span></label><input id="in-lambdaOpen" type="number" step="any" value="0.693"></div>
+        <div class="ctl nerd-only"><label for="in-kappa">Quality multiplier <span class="sym">κ</span></label><input id="in-kappa" type="number" min="0.5" step="any" value="1.15"></div>
+      </div>
+
+      <div class="ctl-group">
+        <h3>Power chips</h3>
+        <div class="ctl"><label for="in-h">$ per GPU, all-in <span class="sym">h</span></label><input id="in-h" type="number" min="0" step="any" value="32000"></div>
+        <div class="ctl"><label for="in-s0">Tokens/sec per GPU <span class="sym">s₀</span></label><input id="in-s0" type="number" min="1" step="any" value="600"></div>
+        <div class="ctl"><label for="in-u">Utilization % <span class="sym">u</span></label><input id="in-u" type="number" min="1" max="100" step="any" value="50"></div>
+        <div class="ctl nerd-only"><label for="in-mu">Efficiency gain %/yr <span class="sym">μ</span></label><input id="in-mu" type="number" step="any" value="25"></div>
+        <div class="ctl nerd-only"><label for="in-fleet">Fleet strategy</label>
+          <select id="in-fleet">
+            <option value="staged" selected>As you grow</option>
+            <option value="upfront">All upfront</option>
+            <option value="manual">Manual N</option>
+          </select>
+        </div>
+        <div class="ctl nerd-only"><label for="in-N">GPU count (manual) <span class="sym">N</span></label><input id="in-N" type="number" min="1" step="1" value="8"></div>
+        <div class="ctl nerd-only"><label for="in-delta">Resale decay %/yr <span class="sym">δ</span></label><input id="in-delta" type="number" step="any" value="45"></div>
+      </div>
+
+      <div class="ctl-group">
+        <h3>Electricity</h3>
+        <div class="ctl"><label for="in-e0">Price $/kWh <span class="sym">e₀</span></label><input id="in-e0" type="number" min="0" step="any" value="0.11"></div>
+        <div class="ctl"><label for="in-gamma">Escalation %/yr <span class="sym">γ</span></label><input id="in-gamma" type="number" step="any" value="6"></div>
+        <div class="ctl nerd-only"><label for="in-wKw">kW per GPU slot <span class="sym">w</span></label><input id="in-wKw" type="number" min="0" step="any" value="1.3"></div>
+        <div class="ctl nerd-only"><label for="in-pue">PUE <span class="sym">φ</span></label><input id="in-pue" type="number" min="1" step="any" value="1.3"></div>
+      </div>
+
+      <div class="ctl-group">
+        <h3>People</h3>
+        <div class="ctl"><label for="in-D">Dev cost, one-time $ <span class="sym">D</span></label><input id="in-D" type="number" min="0" step="any" value="250000"></div>
+        <div class="ctl"><label for="in-mYr">MLOps $/yr <span class="sym">m</span></label><input id="in-mYr" type="number" min="0" step="any" value="240000"></div>
+      </div>
+
+      <div class="ctl-group">
+        <h3>Finance</h3>
+        <div class="ctl"><label for="in-T">Horizon, years <span class="sym">T</span></label><input id="in-T" type="number" min="0.5" max="10" step="any" value="3"></div>
+        <div class="ctl nerd-only"><label for="in-r">Discount rate %/yr <span class="sym">r</span></label><input id="in-r" type="number" step="any" value="12"></div>
+        <div class="ctl nerd-only"><label for="in-vRef">Value $/M tokens <span class="sym">v</span></label><input id="in-vRef" type="number" min="0" step="any" value="20"></div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="card" id="verdict">
+        <div class="verdict-line">
+          <span class="pill" id="verdict-pill"><span class="dot"></span><span id="verdict-word">—</span></span>
+          <span id="verdict-text">—</span>
+        </div>
+        <div class="gates">
+          <div class="gate" id="gate1"><span class="g-status"></span><span class="g-body"><b>Gate 1 &middot; route at the margin</b><span class="g-note"></span></span></div>
+          <div class="gate" id="gate2"><span class="g-status"></span><span class="g-body"><b>Gate 2 &middot; pay the toll</b><span class="g-note"></span></span></div>
+        </div>
+        <p id="verdict-note"></p>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="card">
+        <header>
+          <h2>The glacier cross-section</h2>
+          <span class="sub">what a million tokens costs, month by month</span>
+          <button class="tbl-toggle nerd-only" id="log-toggle" aria-pressed="false">log scale</button>
+          <button class="tbl-toggle" data-table="t-glacier" aria-pressed="false">table</button>
+        </header>
+        <div class="chart-box" id="chart-glacier"></div>
+        <div class="legend" id="legend-glacier"></div>
+        <div class="data-table" id="t-glacier"></div>
+        <p class="plain-note">The shaded blue wedge is your glacier: the gap between what tokens cost to buy and what they cost on your own machines. Prices fall every month (the sun), electricity pushes your floor up (warm ground). The wedge you can harvest has to pay for the toll gate — dev cost plus hardware.</p>
+        <div class="eq-strip nerd-only"><span class="eq" id="eq-glacier"></span></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Race to break even</h2>
+          <span class="sub">cumulative discounted cost of each path</span>
+          <button class="tbl-toggle" data-table="t-race" aria-pressed="false">table</button>
+        </header>
+        <div class="chart-box" id="chart-race"></div>
+        <div class="legend" id="legend-race"></div>
+        <div class="data-table" id="t-race"></div>
+        <p class="plain-note">Building starts in a hole (you paid for chips and engineers on day one) and climbs out only if buying tokens keeps costing more each month than running your own. Where the lines cross is break-even.</p>
+        <div class="eq-strip nerd-only"><span class="eq" id="eq-race"></span></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Token yield force vectors</h2>
+          <span class="sub">value per dollar of token spend, and what pushes it</span>
+          <button class="tbl-toggle" data-table="t-yield" aria-pressed="false">table</button>
+        </header>
+        <div class="chart-box" id="chart-yield"></div>
+        <div class="legend" id="legend-yield"></div>
+        <div class="data-table" id="t-yield"></div>
+        <p class="plain-note">Token yield is how much value you get per dollar spent on tokens. Buying: yield climbs as prices melt. Building: efficiency gains push yield up while rising electricity drags it down — the downward force vector. Whichever line is higher is the better deal that month.</p>
+        <div class="eq-strip nerd-only"><span class="eq" id="eq-yield"></span></div>
+      </div>
+
+      <div class="card nerd-only" id="card-tornado">
+        <header>
+          <h2>What moves the answer</h2>
+          <span class="sub">NPV advantage shift when each input moves ±30%</span>
+        </header>
+        <div class="chart-box" id="chart-tornado"></div>
+        <p class="ctl-note">Bars right of the axis increase the case for building; left decrease it. The longest bars are the assumptions worth pressure-testing first.</p>
+      </div>
+
+      <footer class="site">
+        Deterministic model, month-start convention, continuous rates. Full derivations:
+        <a href="docs/glacier-math.md">nerd version</a> ·
+        <a href="docs/glacier-plain.md">plain version</a>.
+        Companion pieces: <a href="https://claude.ai/code/artifact/aaa96ee8-841e-450f-90a1-52865e584372">Two Gates and a Half-Life</a> ·
+        <a href="https://claude.ai/code/artifact/40c001e6-97f2-4796-bf2f-a538cfdf8142">When Open Source Gets Cheap Enough</a> ·
+        <a href="https://claude.ai/code/artifact/569e7a6d-2292-4403-90e8-c522772700af">Melt Rate</a> (sector model).
+        Defaults are Aug-2026 knowledge-based estimates — plug in your own numbers.
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script id="glacier-engine">
+/* ============================================================
+   GLACIER ENGINE — build-vs-buy economics for LLM inference
+   Pure functions, no DOM. Runs in browser and Node unchanged.
+
+   Conventions (must match docs/glacier-math.md):
+   - time t in YEARS; month index i has t_i = i/12 (month-start)
+   - month-start prices x month token volume, discounted at e^(-r*t_i)
+   - token volumes in Mtok (millions of reference-quality tokens)
+   - prices in $/Mtok; power kW; electricity $/kWh
+   - "open" tokens = reference tokens x kappa (quality multiplier)
+   - idle power is paid: owned fleet draws N*w*PUE kW every hour
+   - overflow above capacity is bought at the comparator price
+   - fleetMode 'staged': tranches bought when demand arrives; each
+     tranche salvages at h*e^(-delta*(T - t_buy))
+   - fleetMode 'upfront': N fixed at t=0, sized to horizon peak at
+     t=0 capability (the closed-form / test-vector convention)
+   - salvage credited at the final month, discounted at e^(-r*T)
+   ============================================================ */
+'use strict';
+
+const GLACIER = (() => {
+  const SECONDS_PER_YEAR = 31557600;   // 365.25 * 86400
+  const HOURS_PER_YEAR   = 8766;       // 365.25 * 24
+
+  // Default parameters: "scaleup" archetype; knowledge-based Aug-2026 values,
+  // sources and low/central/high ranges in docs/glacier-math.md §9.
+  const DEFAULTS = {
+    Tyears: 3,        // decision horizon (yr)
+    r: 0.12,          // continuous discount rate (/yr)
+    Q0m: 5000,        // reference demand at t=0 (Mtok/month)
+    sigma: 1.0,       // movable share of the workload (open models can handle it)
+    g: 0.40,          // demand growth (/yr, continuous)
+    p0: 5.0,          // frontier API blended price ($/Mtok reference)
+    lambda: 0.693,    // frontier price decline (/yr) = 12-month halving
+    pOpen0: 0.50,     // hosted open-weight price ($/Mtok OPEN tokens)
+    lambdaOpen: 0.693,// hosted open-weight price decline (/yr)
+    kappa: 1.15,      // open-model quality multiplier (open tokens per reference token)
+    comparator: 'frontier',  // 'frontier' | 'hostedOpen'
+    fleetMode: 'staged',     // 'staged' | 'upfront' | 'manual'
+    N: 8,             // GPU count when fleetMode='manual'
+    h: 32000,         // all-in $ per GPU slot (card + server share + install)
+    s0: 600,          // effective output tok/s per GPU at t=0
+    mu: 0.25,         // serving+model efficiency gain on owned hardware (/yr)
+    u: 0.50,          // utilization (busy fraction of powered time)
+    wKw: 1.3,         // server kW per GPU slot (powered whenever on)
+    pue: 1.3,         // power usage effectiveness
+    e0: 0.11,         // electricity price ($/kWh)
+    gamma: 0.06,      // electricity escalation (/yr)
+    D: 250000,        // one-time dev/integration cost ($)
+    mYr: 240000,      // ongoing MLOps + maintenance ($/yr)
+    delta: 0.45,      // hardware value decay (/yr)
+    vRef: 20,         // value realized per reference Mtok ($/Mtok), Token Yield view
+  };
+
+  // ---- core simulation -------------------------------------------------
+  function simulate(P) {
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const secPerMonth = SECONDS_PER_YEAR / 12;
+    const hrsPerMonth = HOURS_PER_YEAR / 12;   // 730.5
+    const tAt = i => i / 12;
+
+    // demand & prices per month; only the movable share is in play —
+    // tokens open models can't handle are bought on both paths and cancel
+    const Qbase = P.Q0m * (P.sigma == null ? 1 : P.sigma);
+    const q = [], pF = [], pO = [], eKwh = [], disc = [];
+    for (let i = 0; i < M; i++) {
+      const t = tAt(i);
+      q.push(Qbase * Math.exp(P.g * t));                 // movable reference Mtok
+      pF.push(P.p0 * Math.exp(-P.lambda * t));           // $/Mtok reference
+      pO.push(P.pOpen0 * Math.exp(-P.lambdaOpen * t));   // $/Mtok OPEN
+      eKwh.push(P.e0 * Math.exp(P.gamma * t));           // $/kWh
+      disc.push(Math.exp(-P.r * t));
+    }
+    // comparator price per REFERENCE Mtok (hosted-open serves kappa x tokens)
+    const comp = q.map((_, i) => P.comparator === 'hostedOpen' ? pO[i] * P.kappa : pF[i]);
+
+    const capPerGpuAt = t => P.s0 * Math.exp(P.mu * t) * P.u * secPerMonth / 1e6; // Mtok open/GPU/mo
+
+    // fleet plan: N per month + capex outlays
+    const Nseq = new Array(M).fill(0);
+    const capexAt = new Array(M).fill(0);        // $ spent on GPUs in month i
+    const tranches = [];                          // {n, t} for salvage
+    if (P.fleetMode === 'manual') {
+      const N0 = Math.max(1, Math.round(P.N));
+      Nseq.fill(N0); capexAt[0] = N0 * P.h; tranches.push({ n: N0, t: 0 });
+    } else if (P.fleetMode === 'upfront') {
+      const qOpenPeak = Math.max(...q) * P.kappa;
+      const N0 = Math.max(1, Math.ceil(qOpenPeak / capPerGpuAt(0)));
+      Nseq.fill(N0); capexAt[0] = N0 * P.h; tranches.push({ n: N0, t: 0 });
+    } else { // staged: buy when demand arrives, at current capability
+      let Ncur = 0;
+      for (let i = 0; i < M; i++) {
+        const t = tAt(i);
+        const need = Math.ceil(q[i] * P.kappa / capPerGpuAt(t));
+        if (need > Ncur) {
+          const add = need - Ncur;
+          capexAt[i] += add * P.h;
+          tranches.push({ n: add, t });
+          Ncur = need;
+        }
+        Nseq[i] = Math.max(1, Ncur);
+      }
+      if (tranches.length === 0) { tranches.push({ n: 1, t: 0 }); capexAt[0] = P.h; Nseq.fill(1); }
+    }
+
+    // salvage: each tranche decays from its purchase date to T
+    const salvage = tranches.reduce((s, tr) => s + tr.n * P.h * Math.exp(-P.delta * (P.Tyears - tr.t)), 0);
+    const salvagePV = salvage * Math.exp(-P.r * P.Tyears);
+    const capexPV = capexAt.reduce((s, c, i) => s + c * disc[i], 0);
+    const Hnominal = tranches.reduce((s, tr) => s + tr.n * P.h, 0);
+
+    // monthly flows
+    const rows = [];
+    let cumBuy = 0, cumBuild = P.D;
+    let npvBuy = 0, npvBuildOps = 0, mlopsPV = 0;
+    let breakEvenMonth = null;
+    for (let i = 0; i < M; i++) {
+      const t = tAt(i);
+      const N = Nseq[i];
+      const capOpen = N * capPerGpuAt(t);                            // Mtok open
+      const qOpen = q[i] * P.kappa;
+      const selfServed = Math.min(qOpen, capOpen);
+      const overflowRef = Math.max(0, qOpen - capOpen) / P.kappa;    // reference Mtok
+      const buyCost = comp[i] * q[i];
+      const elec = N * P.wKw * P.pue * hrsPerMonth * eKwh[i];
+      const mlops = P.mYr / 12;
+      const overflowCost = comp[i] * overflowRef;
+      const buildOps = elec + mlops + overflowCost;
+
+      npvBuy += disc[i] * buyCost;
+      npvBuildOps += disc[i] * buildOps;
+      mlopsPV += disc[i] * mlops;
+      cumBuy += disc[i] * buyCost;
+      cumBuild += disc[i] * (buildOps + capexAt[i]);
+      let cumBuildShown = cumBuild;
+      if (i === M - 1) cumBuildShown -= salvagePV;  // salvage credited at end
+      if (breakEvenMonth === null && cumBuy >= cumBuildShown) breakEvenMonth = i;
+
+      rows.push({
+        i, t, q: q[i], pF: pF[i], pO: pO[i], comp: comp[i], N,
+        capOpen, selfServed, overflowRef,
+        buyCost, elec, mlops, overflowCost, buildOps, capex: capexAt[i],
+        eKwh: eKwh[i],
+        cumBuy, cumBuild: cumBuildShown,
+      });
+    }
+    const npvBuild = P.D + capexPV + npvBuildOps - salvagePV;
+    const npvAdvantage = npvBuy - npvBuild;   // >0 => BUILD wins vs comparator
+
+    // per-Mtok views (reference basis); amortized view is intuition-only
+    const amortMonthly = (P.D + capexPV - salvagePV) / M;
+    for (const rw of rows) {
+      rw.buildVarElec = rw.elec / rw.q;                        // electricity $/ref Mtok (fleet basis, incl idle)
+      rw.buildAllIn = (rw.buildOps + amortMonthly) / rw.q;     // $/ref Mtok, amortized view
+      rw.yieldBuy = P.vRef / rw.comp;
+      rw.yieldBuild = P.vRef / rw.buildAllIn;
+    }
+
+    return { P: { ...P }, M, Nfinal: Nseq[M - 1], Hnominal, capexPV, salvage, salvagePV, mlopsPV,
+             rows, npvBuy, npvBuild, npvAdvantage, breakEvenMonth, amortMonthly };
+  }
+
+  // ---- glacier analytics ----------------------------------------------
+  // epsilon0: electricity $ per OPEN Mtok at t=0 (marginal per-token basis)
+  function epsilon0(P) {
+    return P.wKw * P.pue * P.e0 / (3600 * P.s0 * P.u) * 1e6;
+  }
+
+  // Per-reference-token glacier margin a(t) = c(t) - kappa*eps(t).
+  // mode: 'melts' | 'never' | 'alreadyMelted' | 'opens'
+  function meltTime(P) {
+    const eps0 = epsilon0(P);
+    const c0 = P.comparator === 'hostedOpen' ? P.pOpen0 * P.kappa : P.p0;
+    const lam = P.comparator === 'hostedOpen' ? P.lambdaOpen : P.lambda;
+    const k = lam + P.gamma - P.mu;          // net melt rate (/yr)
+    const ratio = c0 / (P.kappa * eps0);
+    if (ratio <= 1) {
+      if (k < 0) return { tStar: Math.log(ratio) / k, mode: 'opens' };
+      return { tStar: 0, mode: 'alreadyMelted' };
+    }
+    if (k <= 0) return { tStar: Infinity, mode: 'never' };
+    return { tStar: Math.log(ratio) / k, mode: 'melts' };
+  }
+
+  // Discounted glacier value: positive-margin months only (numeric; closed form in docs)
+  function glacierValue(P, sim) {
+    const eps0 = epsilon0(P);
+    let G = 0;
+    for (const rw of sim.rows) {
+      const eps = eps0 * Math.exp((P.gamma - P.mu) * rw.t);
+      const a = rw.comp - P.kappa * eps;      // $/ref Mtok
+      if (a > 0) G += Math.exp(-P.r * rw.t) * a * rw.q;
+    }
+    return G;
+  }
+
+  // Minimum viable scale: log-bisect Q0m to zero NPV advantage (integer fleets
+  // make this a step function; result reported ~2 sig figs)
+  function minViableScale(P) {
+    const adv = Q0m => simulate({ ...P, Q0m }).npvAdvantage;
+    let lo = 1, hi = 1e8;
+    if (adv(hi) <= 0) return Infinity;
+    if (adv(lo) > 0) return 0;
+    for (let it = 0; it < 60; it++) {
+      const mid = Math.sqrt(lo * hi);
+      if (adv(mid) > 0) hi = mid; else lo = mid;
+    }
+    return hi;
+  }
+
+  // Max dev cost that still breaks even (D enters the NPV additively)
+  function maxDevCost(P, sim) { return P.D + sim.npvAdvantage; }
+
+  // Electricity share of discounted build cost
+  function elecShare(P, sim) {
+    let elecPV = 0;
+    for (const rw of sim.rows) elecPV += Math.exp(-P.r * rw.t) * rw.elec;
+    return elecPV / sim.npvBuild;
+  }
+
+  // Tornado: +/-30% one-at-a-time; NPV-advantage deltas
+  function tornado(P, base) {
+    const KEYS = [
+      ['lambda', 'API price melt rate λ'],
+      ['e0', 'Electricity price e₀'],
+      ['gamma', 'Electricity escalation γ'],
+      ['u', 'Utilization u'],
+      ['s0', 'GPU throughput s₀'],
+      ['kappa', 'Quality gap κ'],
+      ['D', 'Dev cost D'],
+      ['h', 'GPU price h'],
+      ['mYr', 'MLOps cost m'],
+    ];
+    return KEYS.map(([key, label]) => {
+      const up = simulate({ ...P, [key]: P[key] * 1.3 }).npvAdvantage - base.npvAdvantage;
+      const dn = simulate({ ...P, [key]: P[key] * 0.7 }).npvAdvantage - base.npvAdvantage;
+      return { key, label, up, dn };
+    });
+  }
+
+  return { DEFAULTS, simulate, epsilon0, meltTime, glacierValue,
+           minViableScale, maxDevCost, elecShare, tornado,
+           SECONDS_PER_YEAR, HOURS_PER_YEAR };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
+</script>
+
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const state = { ...GLACIER.DEFAULTS };
+
+  const PRESETS = {
+    startup:    { Q0m: 200,   g: 0.60, D: 150000, mYr: 120000 },
+    scaleup:    { Q0m: 5000,  g: 0.40, D: 250000, mYr: 240000 },
+    enterprise: { Q0m: 50000, g: 0.25, D: 400000, mYr: 480000 },
+  };
+
+  // [inputId, stateKey, scale] — UI percent fields scale by 0.01
+  const BIND = [
+    ['in-Q0m','Q0m',1], ['in-sigma','sigma',0.01], ['in-g','g',0.01], ['in-p0','p0',1], ['in-lambda','lambda',1],
+    ['in-pOpen0','pOpen0',1], ['in-lambdaOpen','lambdaOpen',1], ['in-kappa','kappa',1],
+    ['in-h','h',1], ['in-s0','s0',1], ['in-u','u',0.01], ['in-mu','mu',0.01],
+    ['in-N','N',1], ['in-delta','delta',0.01], ['in-e0','e0',1], ['in-gamma','gamma',0.01],
+    ['in-wKw','wKw',1], ['in-pue','pue',1], ['in-D','D',1], ['in-mYr','mYr',1],
+    ['in-T','Tyears',1], ['in-r','r',0.01], ['in-vRef','vRef',1],
+  ];
+
+  // ---------- formatting ----------
+  const fmtUSD = v => {
+    const a = Math.abs(v), sign = v < 0 ? '−' : '';
+    if (a >= 995e6) return sign + '$' + (a/1e9).toFixed(2) + 'B';
+    if (a >= 995e3) return sign + '$' + (a/1e6).toFixed(a >= 9.95e6 ? 1 : 2) + 'M';
+    if (a >= 1000)  return sign + '$' + Math.round(a/1000) + 'k';
+    return sign + '$' + a.toFixed(a < 10 ? 2 : 0);
+  };
+  const fmtPrice = v => v >= 100 ? '$' + Math.round(v) : v >= 1 ? '$' + v.toFixed(2) : '$' + v.toFixed(3);
+  const fmtTok = mtok => mtok >= 995e3 ? (mtok/1e6).toFixed(1) + 'T' : mtok >= 995 ? (mtok/1e3).toFixed(mtok >= 9950 ? 0 : 1) + 'B' : Math.round(mtok) + 'M';
+  const fmtX = v => v >= 100 ? Math.round(v) + '×' : v.toFixed(1) + '×';
+
+  const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const COLORS = () => ({
+    build: cssVar('--s-build'), frontier: cssVar('--s-frontier'), open: cssVar('--s-open'),
+    ink: cssVar('--ink'), ink2: cssVar('--ink-2'), muted: cssVar('--muted'),
+    grid: cssVar('--grid'), baseline: cssVar('--baseline'), surface: cssVar('--surface'),
+    good: cssVar('--st-good'), goodText: cssVar('--st-good-text'),
+    warn: cssVar('--st-warn'), critical: cssVar('--st-critical'), accent: cssVar('--accent'),
+  });
+
+  // ---------- tick helpers ----------
+  function niceTicks(lo, hi, n) {
+    if (hi === lo) hi = lo + 1;
+    const span = hi - lo, step0 = Math.pow(10, Math.floor(Math.log10(span / n)));
+    let step = step0;
+    for (const m of [1, 2, 2.5, 5, 10]) { if (span / (step0 * m) <= n) { step = step0 * m; break; } }
+    const t0 = Math.ceil(lo / step) * step, out = [];
+    for (let v = t0; v <= hi + 1e-9 * span; v += step) out.push(v);
+    return out;
+  }
+  function logTicks(lo, hi) {
+    const out = [];
+    for (let d = Math.floor(Math.log10(lo)); d <= Math.ceil(Math.log10(hi)); d++) {
+      const v = Math.pow(10, d);
+      if (v >= lo / 1.001 && v <= hi * 1.001) out.push(v);
+    }
+    return out.length >= 2 ? out : niceTicks(lo, hi, 4);
+  }
+
+  // ---------- generic line chart ----------
+  // series: [{key,name,color,values,width,opacity}] ; band: {upper,lower,color} clipped to upper>lower
+  function lineChart(boxId, legendId, cfg) {
+    const box = document.getElementById(boxId);
+    const C = COLORS();
+    const M = cfg.months;
+    const W = 760, H = 320, mg = { l: 58, r: 20, t: 16, b: 34 };
+    const iw = W - mg.l - mg.r, ih = H - mg.t - mg.b;
+    const all = cfg.series.flatMap(s => s.values).filter(v => isFinite(v));
+    let lo = cfg.log ? Math.min(...all.filter(v => v > 0)) : Math.min(0, ...all);
+    let hi = Math.max(...all);
+    if (cfg.log) { lo = Math.pow(10, Math.floor(Math.log10(lo))); hi = Math.pow(10, Math.ceil(Math.log10(hi))); }
+    else { const pad = (hi - lo) * 0.06; hi += pad; }
+    const x = i => mg.l + (M <= 1 ? 0 : i / (M - 1) * iw);
+    const y = v => cfg.log
+      ? mg.t + ih - (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)) * ih
+      : mg.t + ih - (v - lo) / (hi - lo) * ih;
+    const ticks = cfg.log ? logTicks(lo, hi) : niceTicks(lo, hi, 5);
+    const xtickEvery = M > 60 ? 12 : 6;
+
+    let g = '';
+    // gridlines + y labels
+    for (const tv of ticks) {
+      const yy = y(tv);
+      g += `<line x1="${mg.l}" y1="${yy}" x2="${W - mg.r}" y2="${yy}" stroke="${C.grid}" stroke-width="1"/>`;
+      g += `<text x="${mg.l - 8}" y="${yy + 3.5}" text-anchor="end" font-size="10.5" fill="${C.muted}" font-family="IBM Plex Mono,monospace">${cfg.fmtY(tv)}</text>`;
+    }
+    // x axis + ticks
+    g += `<line x1="${mg.l}" y1="${mg.t + ih}" x2="${W - mg.r}" y2="${mg.t + ih}" stroke="${C.baseline}" stroke-width="1"/>`;
+    for (let i = 0; i < M; i += xtickEvery) {
+      g += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="${C.muted}" font-family="IBM Plex Mono,monospace">${i}</text>`;
+    }
+    g += `<text x="${W - mg.r}" y="${H - 12}" text-anchor="end" font-size="10.5" fill="${C.muted}">month</text>`;
+    g += `<text x="${mg.l}" y="${mg.t - 4}" font-size="11" fill="${C.ink2}">${cfg.yLabel}</text>`;
+
+    // band (glacier wedge)
+    if (cfg.band) {
+      const { upper, lower, color } = cfg.band;
+      let up = '', down = '', started = false, parts = [];
+      for (let i = 0; i < M; i++) {
+        if (upper[i] > lower[i] && isFinite(upper[i]) && isFinite(lower[i]) && (!cfg.log || lower[i] > 0)) {
+          if (!started) { parts.push({ from: i, up: [], dn: [] }); started = true; }
+          const p = parts[parts.length - 1];
+          p.up.push(`${x(i)},${y(upper[i])}`); p.dn.unshift(`${x(i)},${y(lower[i])}`);
+        } else started = false;
+      }
+      for (const p of parts) {
+        g += `<polygon points="${p.up.join(' ')} ${p.dn.join(' ')}" fill="${color}" opacity="0.13"/>`;
+      }
+    }
+    // series lines + end dots
+    for (const s of cfg.series) {
+      const pts = s.values.map((v, i) => (!isFinite(v) || (cfg.log && v <= 0)) ? null : `${x(i)},${y(v)}`).filter(Boolean);
+      g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" stroke-linecap="round" opacity="${s.opacity || 1}"/>`;
+      const lastV = s.values[M - 1];
+      if (isFinite(lastV) && (!cfg.log || lastV > 0)) {
+        g += `<circle cx="${x(M - 1)}" cy="${y(lastV)}" r="4" fill="${s.color}" stroke="${C.surface}" stroke-width="2"/>`;
+      }
+    }
+    // markers (break-even)
+    for (const mk of (cfg.markers || [])) {
+      g += `<circle cx="${x(mk.i)}" cy="${y(mk.v)}" r="5.5" fill="${C.good}" stroke="${C.surface}" stroke-width="2"/>`;
+      const anchor = mk.i > M * 0.72 ? 'end' : 'start';
+      const dx = mk.i > M * 0.72 ? -9 : 9;
+      g += `<text x="${x(mk.i) + dx}" y="${y(mk.v) - 9}" font-size="11" font-weight="600" text-anchor="${anchor}" fill="${C.ink}">${mk.label}</text>`;
+    }
+    // crosshair placeholder
+    g += `<line id="${boxId}-xh" x1="0" y1="${mg.t}" x2="0" y2="${mg.t + ih}" stroke="${C.baseline}" stroke-width="1" visibility="hidden"/>`;
+
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${cfg.yLabel} over ${M} months" tabindex="0">${g}</svg><div class="tip" id="${boxId}-tip"></div>`;
+
+    // legend
+    if (legendId) {
+      const lg = document.getElementById(legendId);
+      lg.textContent = '';
+      const items = [...cfg.series];
+      if (cfg.band) items.push({ name: cfg.band.name, color: cfg.band.color, isFill: true });
+      for (const s of items) {
+        const k = document.createElement('span'); k.className = 'key';
+        const sw = document.createElement('span');
+        sw.className = s.isFill ? 'swatch-fill' : 'swatch-line';
+        if (s.isFill) sw.style.background = s.color; else sw.style.borderTopColor = s.color;
+        const nm = document.createElement('span'); nm.textContent = s.name;
+        k.append(sw, nm); lg.append(k);
+      }
+    }
+
+    // hover + keyboard
+    const svg = box.querySelector('svg'), tip = document.getElementById(boxId + '-tip');
+    const xh = () => svg.querySelector('#' + CSS.escape(boxId + '-xh'));
+    let curI = null;
+    const show = (i, clientX) => {
+      curI = i;
+      const line = xh(); line.setAttribute('x1', x(i)); line.setAttribute('x2', x(i)); line.setAttribute('visibility', 'visible');
+      tip.textContent = '';
+      const tt = document.createElement('div'); tt.className = 'tip-t'; tt.textContent = 'month ' + i + '  ·  year ' + (i / 12).toFixed(1);
+      tip.append(tt);
+      for (const s of cfg.series) {
+        const row = document.createElement('div'); row.className = 'row';
+        const key = document.createElement('span'); key.className = 'key-line'; key.style.borderTopColor = s.color;
+        const n = document.createElement('span'); n.className = 'n'; n.textContent = s.name;
+        const v = document.createElement('span'); v.className = 'v'; v.textContent = cfg.fmtY(s.values[i]);
+        row.append(key, n, v); tip.append(row);
+      }
+      tip.style.display = 'block';
+      const bw = box.getBoundingClientRect(), tw = tip.getBoundingClientRect();
+      const px = (x(i) / W) * bw.width;
+      tip.style.left = Math.min(Math.max(4, px + 14), bw.width - tw.width - 4) + 'px';
+      tip.style.top = '18px';
+    };
+    const hide = () => { tip.style.display = 'none'; const l = xh(); if (l) l.setAttribute('visibility', 'hidden'); curI = null; };
+    svg.addEventListener('pointermove', ev => {
+      const r = svg.getBoundingClientRect();
+      const fx = (ev.clientX - r.left) / r.width * W;
+      const i = Math.max(0, Math.min(M - 1, Math.round((fx - mg.l) / iw * (M - 1))));
+      show(i);
+    });
+    svg.addEventListener('pointerleave', hide);
+    svg.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowRight') { show(Math.min(M - 1, (curI ?? -1) + 1)); ev.preventDefault(); }
+      else if (ev.key === 'ArrowLeft') { show(Math.max(0, (curI ?? M) - 1)); ev.preventDefault(); }
+      else if (ev.key === 'Escape') hide();
+    });
+    svg.addEventListener('blur', hide);
+  }
+
+  // ---------- tornado ----------
+  function tornadoChart(boxId, rows) {
+    const box = document.getElementById(boxId), C = COLORS();
+    const sorted = [...rows].sort((a, b) => Math.max(Math.abs(b.up), Math.abs(b.dn)) - Math.max(Math.abs(a.up), Math.abs(a.dn)));
+    const W = 760, rowH = 30, mg = { l: 210, r: 70, t: 8, b: 22 };
+    const H = mg.t + sorted.length * rowH + mg.b;
+    const maxAbs = Math.max(1, ...sorted.flatMap(r => [Math.abs(r.up), Math.abs(r.dn)]));
+    const cx = mg.l + (W - mg.l - mg.r) / 2, half = (W - mg.l - mg.r) / 2;
+    const xd = v => cx + (v / maxAbs) * half;
+    let g = `<line x1="${cx}" y1="${mg.t}" x2="${cx}" y2="${H - mg.b}" stroke="${C.baseline}" stroke-width="1"/>`;
+    sorted.forEach((r, idx) => {
+      const yy = mg.t + idx * rowH + rowH / 2;
+      g += `<text x="${mg.l - 12}" y="${yy + 4}" text-anchor="end" font-size="12" fill="${C.ink2}">${r.label}</text>`;
+      for (const v of [r.dn, r.up]) {
+        if (Math.abs(v) < 1e-9) continue;
+        const x0 = Math.min(cx, xd(v)), wRect = Math.abs(xd(v) - cx);
+        const col = v >= 0 ? C.build : C.critical;
+        const rx = v >= 0 ? `M ${x0} ${yy - 7} h ${Math.max(0, wRect - 4)} a 4 4 0 0 1 4 4 v 6 a 4 4 0 0 1 -4 4 h -${Math.max(0, wRect - 4)} z`
+                          : `M ${x0 + wRect} ${yy - 7} h -${Math.max(0, wRect - 4)} a 4 4 0 0 0 -4 4 v 6 a 4 4 0 0 0 4 4 h ${Math.max(0, wRect - 4)} z`;
+        g += `<path d="${rx}" fill="${col}" opacity="0.75"/>`;
+      }
+      const ext = Math.abs(r.up) >= Math.abs(r.dn) ? r.up : r.dn;
+      const anchor = ext >= 0 ? 'start' : 'end';
+      const tx = Math.max(mg.l + 44, Math.min(W - 4, xd(ext) + (ext >= 0 ? 6 : -6)));
+      g += `<text x="${tx}" y="${yy + 4}" text-anchor="${anchor}" font-size="10.5" fill="${C.muted}" font-family="IBM Plex Mono,monospace">${fmtUSD(ext)}</text>`;
+    });
+    g += `<text x="${cx}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="${C.muted}">← hurts building  ·  helps building →</text>`;
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sensitivity of NPV advantage">${g}</svg>`;
+  }
+
+  // ---------- tables ----------
+  function fillTable(id, headers, rows) {
+    const holder = document.getElementById(id);
+    holder.textContent = '';
+    const table = document.createElement('table');
+    const thr = document.createElement('tr');
+    for (const h of headers) { const th = document.createElement('th'); th.textContent = h; thr.append(th); }
+    table.append(thr);
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      for (const c of r) { const td = document.createElement('td'); td.textContent = c; tr.append(td); }
+      table.append(tr);
+    }
+    holder.append(table);
+  }
+
+  // ---------- KPI row ----------
+  function kpi(label, value, cls, detail) {
+    return { label, value, cls: cls || '', detail: detail || '' };
+  }
+  function renderKpis(list) {
+    const host = $('#kpis'); host.textContent = '';
+    for (const k of list) {
+      const el = document.createElement('div'); el.className = 'kpi';
+      const l = document.createElement('div'); l.className = 'k-label'; l.textContent = k.label;
+      const v = document.createElement('div'); v.className = 'k-value ' + k.cls; v.textContent = k.value;
+      el.append(l, v);
+      if (k.detail) { const d = document.createElement('div'); d.className = 'k-detail'; d.textContent = k.detail; el.append(d); }
+      host.append(el);
+    }
+  }
+
+  // ---------- main render ----------
+  let logScale = false;
+  function render() {
+    const C = COLORS();
+    const P = { ...state };
+    const sim = GLACIER.simulate(P);
+    const altComp = P.comparator === 'frontier' ? 'hostedOpen' : 'frontier';
+    const simAlt = GLACIER.simulate({ ...P, comparator: altComp });
+    const melt = GLACIER.meltTime(P);
+    const eps0 = GLACIER.epsilon0(P);
+    const G = GLACIER.glacierValue(P, sim);
+    const minScale = GLACIER.minViableScale(P);
+    const dMax = GLACIER.maxDevCost(P, sim);
+    const eShare = GLACIER.elecShare(P, sim);
+    const M = sim.M, rows = sim.rows;
+    const compName = P.comparator === 'frontier' ? 'the frontier API' : 'hosted open-weights';
+
+    // ----- verdict -----
+    const vCard = $('#verdict'), pill = $('#verdict-pill'), word = $('#verdict-word');
+    const buildWins = sim.npvAdvantage >= 0;
+    const hostedSim = P.comparator === 'hostedOpen' ? sim : simAlt;
+    const hostedBeatsBuild = hostedSim.npvAdvantage < 0;
+    let cls, pw, text, note = '';
+    const yrs = P.Tyears === 1 ? '1 year' : P.Tyears + ' years';
+    if (buildWins && (!hostedBeatsBuild || P.comparator === 'hostedOpen')) {
+      cls = ''; pw = 'BUILD'; 
+      text = `Self-hosting beats ${compName} by ${fmtUSD(sim.npvAdvantage)} over ${yrs}` +
+        (sim.breakEvenMonth !== null ? ` — break-even in month ${sim.breakEvenMonth}.` : '.');
+    } else if (buildWins && hostedBeatsBuild) {
+      cls = 'mixed'; pw = 'IT DEPENDS';
+      text = `Building beats ${compName} by ${fmtUSD(sim.npvAdvantage)} — but renting the same open model (hosted open-weights) is ${fmtUSD(-simAlt.npvAdvantage)} cheaper than building it yourself.`;
+      note = 'Building only wins outright if APIs are off the table (data residency, compliance, latency) or your utilization and throughput reach provider grade.';
+    } else {
+      cls = 'bad'; pw = 'BUY';
+      text = `Keep buying: building costs ${fmtUSD(-sim.npvAdvantage)} more than ${compName} over ${yrs}.`;
+      if (minScale !== Infinity && minScale > P.Q0m) {
+        note = `At these assumptions, building starts to pay at roughly ${fmtTok(minScale)} tokens/month (you are at ${fmtTok(P.Q0m)}).`;
+      } else if (minScale === Infinity) {
+        note = 'No scale rescues it under these assumptions — the melt rate and your cost floor decide this, not volume.';
+      }
+    }
+    vCard.className = 'card ' + cls;
+    vCard.id = 'verdict';
+    word.textContent = pw;
+    pill.style.background = cls === 'bad' ? 'rgba(208,59,59,.12)' : cls === 'mixed' ? 'rgba(250,178,25,.15)' : 'rgba(12,163,12,.12)';
+    pill.style.color = cls === 'bad' ? C.critical : cls === 'mixed' ? cssVar('--ink') : C.goodText;
+    pill.querySelector('.dot').style.background = cls === 'bad' ? C.critical : cls === 'mixed' ? C.warn : C.good;
+    $('#verdict-text').textContent = text;
+    $('#verdict-note').textContent = note;
+
+    // ----- the two gates (cf. "Two Gates and a Half-Life", Props 1-2) -----
+    const toll = P.D + sim.capexPV + sim.mlopsPV - sim.salvagePV;
+    const marginOpen = melt.mode === 'melts' || melt.mode === 'never';
+    const g1 = document.getElementById('gate1');
+    g1.classList.toggle('pass', marginOpen); g1.classList.toggle('fail', !marginOpen);
+    g1.querySelector('.g-status').textContent = marginOpen ? 'PASS' : 'FAIL';
+    g1.querySelector('.g-note').textContent = marginOpen
+      ? (melt.mode === 'never'
+          ? 'A token on your own metal stays cheaper than buying at these rates — the margin never melts.'
+          : 'A token on your own metal is cheaper than buying until year ' + melt.tStar.toFixed(1) + ' — worth routing at the margin until then.')
+      : (melt.mode === 'opens'
+          ? 'Buying is cheaper per token today; the margin only opens around year ' + Math.abs(melt.tStar).toFixed(1) + '.'
+          : 'Already melted: buying is cheaper per token from day one.');
+    const partPass = sim.npvAdvantage >= 0;
+    const g2 = document.getElementById('gate2');
+    g2.classList.toggle('pass', partPass); g2.classList.toggle('fail', !partPass);
+    g2.querySelector('.g-status').textContent = partPass ? 'PASS' : 'FAIL';
+    g2.querySelector('.g-note').textContent = 'Harvestable glacier ' + fmtUSD(G) + ' vs toll ' + fmtUSD(toll) +
+      ' (dev + hardware + ops − salvage). ' + (partPass
+        ? 'The savings cover the fixed cost of standing it up.'
+        : (marginOpen ? 'The margin is real but the fixed cost eats it — the mid-size trap the two-gate model exists to catch.'
+                      : 'No margin and no coverage.'));
+
+    // ----- KPIs -----
+    const meltStr = melt.mode === 'never' ? 'never' : melt.mode === 'alreadyMelted' ? 'gone' :
+      melt.mode === 'opens' ? 'opens yr ' + melt.tStar.toFixed(1) : melt.tStar.toFixed(1) + ' yr';
+    renderKpis([
+      kpi('NPV advantage of building', fmtUSD(sim.npvAdvantage), sim.npvAdvantage >= 0 ? 'good' : 'bad', 'vs ' + compName + ', discounted'),
+      kpi('Break-even', sim.breakEvenMonth !== null ? 'month ' + sim.breakEvenMonth : 'never', sim.breakEvenMonth !== null ? 'good' : 'bad', 'within the ' + yrs + ' horizon'),
+      kpi('Glacier melt time t*', meltStr, '', 'margin over electricity floor'),
+      kpi('Harvestable glacier', fmtUSD(G), '', 'discounted margin vs toll ' + fmtUSD(P.D + sim.capexPV + sim.mlopsPV - sim.salvagePV)),
+      kpi('Min viable scale', minScale === Infinity ? 'none' : fmtTok(minScale) + '/mo', '', 'volume where building starts to pay'),
+      kpi('Electricity floor ε₀', fmtPrice(eps0 * P.kappa) + '/M', '', eShare >= 0 ? (eShare * 100).toFixed(1) + '% of build cost is power' : ''),
+    ]);
+
+    // ----- glacier chart -----
+    const months = rows.map(r => r.i);
+    const frontier = rows.map(r => r.pF);
+    const hostedRef = rows.map(r => r.pO * P.kappa);
+    const buildAllIn = rows.map(r => r.buildAllIn);
+    const elecFloor = rows.map(r => P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t));
+    const compSeries = rows.map(r => r.comp);
+    const series = [
+      { key: 'frontier', name: 'Frontier API', color: C.frontier, values: frontier },
+      { key: 'open', name: 'Hosted open (κ-adj)', color: C.open, values: hostedRef },
+      { key: 'build', name: 'Build, all-in', color: C.build, values: buildAllIn, width: 2.5 },
+    ];
+    if (document.body.dataset.mode === 'nerd') {
+      series.push({ key: 'floor', name: 'Electricity floor', color: C.build, values: elecFloor, width: 1.5, opacity: 0.55 });
+    }
+    lineChart('chart-glacier', 'legend-glacier', {
+      months: M, series,
+      band: { upper: compSeries, lower: buildAllIn, color: C.build, name: 'the glacier (your margin)' },
+      fmtY: fmtPrice, yLabel: '$ per 1M reference tokens', log: logScale,
+    });
+    $('#eq-glacier').innerHTML =
+      'a(t) = c(t) − κ·ε(t)&emsp;&emsp;ε(t) = wφe₀e<sup>(γ−μ)t</sup>/(3600·s₀u)&emsp;&emsp;t* = ln(c₀/κε₀)/(λ+γ−μ) = ' +
+      (melt.mode === 'never' ? '∞' : melt.tStar.toFixed(2) + ' yr') +
+      '&emsp;&emsp;ε₀ = ' + fmtPrice(eps0) + '/M open tok';
+    fillTable('t-glacier', ['month', 'frontier $/M', 'hosted-open $/M (κ-adj)', 'build all-in $/M', 'electricity $/M', 'glacier margin $/M'],
+      rows.filter((_, i) => i % 3 === 0).map(r => [
+        String(r.i), fmtPrice(r.pF), fmtPrice(r.pO * P.kappa), fmtPrice(r.buildAllIn),
+        fmtPrice(P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t)),
+        fmtPrice(Math.max(0, r.comp - P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t))),
+      ]));
+
+    // ----- race chart -----
+    const beM = sim.breakEvenMonth;
+    lineChart('chart-race', 'legend-race', {
+      months: M,
+      series: [
+        { key: 'buy', name: 'Keep buying (cum.)', color: C.frontier, values: rows.map(r => r.cumBuy) },
+        { key: 'build', name: 'Build (cum., incl. toll)', color: C.build, values: rows.map(r => r.cumBuild), width: 2.5 },
+      ],
+      markers: beM !== null ? [{ i: beM, v: rows[beM].cumBuy, label: 'break-even · m' + beM }] : [],
+      fmtY: fmtUSD, yLabel: '$ cumulative, discounted', log: false,
+    });
+    $('#eq-race').innerHTML =
+      'NPV<sub>adv</sub> = ∫₀ᵀ [c(t)Q(t) − κε(t)Q(t) − m]e<sup>−rt</sup>dt − D − Σ capex·e<sup>−rt</sup> + V(T)e<sup>−rT</sup> = ' + fmtUSD(sim.npvAdvantage) +
+      '&emsp;&emsp;toll = D + PV(capex) − PV(salvage) = ' + fmtUSD(P.D + sim.capexPV - sim.salvagePV);
+    fillTable('t-race', ['month', 'buy this month', 'build ops this month', 'capex', 'cum. buy (disc.)', 'cum. build (disc.)'],
+      rows.filter((_, i) => i % 3 === 0).map(r => [
+        String(r.i), fmtUSD(r.buyCost), fmtUSD(r.buildOps), r.capex ? fmtUSD(r.capex) : '—',
+        fmtUSD(r.cumBuy), fmtUSD(r.cumBuild),
+      ]));
+
+    // ----- yield chart -----
+    lineChart('chart-yield', 'legend-yield', {
+      months: M,
+      series: [
+        { key: 'ybuy', name: 'Token yield · buying', color: C.frontier, values: rows.map(r => r.yieldBuy) },
+        { key: 'ybuild', name: 'Token yield · building', color: C.build, values: rows.map(r => r.yieldBuild), width: 2.5 },
+      ],
+      fmtY: fmtX, yLabel: 'value multiple per $ of token spend', log: false,
+    });
+    const sigmaE = eShare;
+    $('#eq-yield').innerHTML =
+      'y = v/cost&emsp;&emsp;d ln y<sub>buy</sub>/dt = +λ = +' + (P.lambda * 100).toFixed(0) + '%/yr' +
+      '&emsp;&emsp;d ln y<sub>build</sub>/dt ≈ μ·σ<sub>var</sub> − γ·σ<sub>E</sub>&emsp;(σ<sub>E</sub> = ' + (sigmaE * 100).toFixed(1) + '% → electricity drag ≈ −' + (P.gamma * sigmaE * 100).toFixed(2) + '%/yr)';
+    fillTable('t-yield', ['month', 'buy $/M', 'build all-in $/M', 'yield buying', 'yield building'],
+      rows.filter((_, i) => i % 3 === 0).map(r => [
+        String(r.i), fmtPrice(r.comp), fmtPrice(r.buildAllIn), fmtX(r.yieldBuy), fmtX(r.yieldBuild),
+      ]));
+
+    // ----- tornado (nerd) -----
+    if (document.body.dataset.mode === 'nerd') {
+      tornadoChart('chart-tornado', GLACIER.tornado(P, sim));
+    }
+  }
+
+  // ---------- wiring ----------
+  function syncInputsFromState() {
+    for (const [id, key, scale] of BIND) {
+      const el = document.getElementById(id);
+      const v = state[key] / scale;
+      el.value = (Math.abs(v) >= 1000) ? String(Math.round(v)) : String(+v.toFixed(4));
+    }
+    $('#in-comparator').value = state.comparator;
+    $('#in-fleet').value = state.fleetMode;
+  }
+  for (const [id, key, scale] of BIND) {
+    document.getElementById(id).addEventListener('input', ev => {
+      const v = parseFloat(ev.target.value);
+      if (isFinite(v)) { state[key] = v * scale; requestAnimationFrame(render); }
+    });
+  }
+  $('#in-comparator').addEventListener('input', ev => { state.comparator = ev.target.value; render(); });
+  $('#in-fleet').addEventListener('input', ev => { state.fleetMode = ev.target.value; render(); });
+  $('#in-half').addEventListener('input', ev => {
+    const half = parseFloat(ev.target.value);
+    state.lambda = half >= 99 ? 0 : Math.log(2) / half;
+    state.lambdaOpen = state.lambda;
+    syncInputsFromState(); render();
+  });
+
+  // presets
+  document.querySelectorAll('#presets .chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#presets .chip').forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      Object.assign(state, PRESETS[btn.dataset.preset]);
+      syncInputsFromState(); render();
+    });
+  });
+
+  // mode toggle
+  const setMode = mode => {
+    document.body.dataset.mode = mode;
+    $('#mode-simple').setAttribute('aria-pressed', String(mode === 'simple'));
+    $('#mode-nerd').setAttribute('aria-pressed', String(mode === 'nerd'));
+    try { localStorage.setItem('glacier-mode', mode); } catch (e) {}
+    render();
+  };
+  $('#mode-simple').addEventListener('click', () => setMode('simple'));
+  $('#mode-nerd').addEventListener('click', () => setMode('nerd'));
+
+  // table toggles
+  document.querySelectorAll('.tbl-toggle[data-table]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = document.getElementById(btn.dataset.table);
+      const open = !t.classList.contains('open');
+      t.classList.toggle('open', open);
+      btn.setAttribute('aria-pressed', String(open));
+    });
+  });
+  $('#log-toggle').addEventListener('click', () => {
+    logScale = !logScale;
+    $('#log-toggle').setAttribute('aria-pressed', String(logScale));
+    render();
+  });
+
+  // theme change re-render (colors are resolved at render time)
+  try {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => render());
+  } catch (e) {}
+
+  // boot
+  let mode = 'simple';
+  try { mode = localStorage.getItem('glacier-mode') || 'simple'; } catch (e) {}
+  try {
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('mode') === 'nerd' || qs.get('mode') === 'simple') mode = qs.get('mode');
+    if (qs.get('theme') === 'dark' || qs.get('theme') === 'light') document.documentElement.dataset.theme = qs.get('theme');
+  } catch (e) {}
+  document.body.dataset.mode = mode;
+  $('#mode-simple').setAttribute('aria-pressed', String(mode === 'simple'));
+  $('#mode-nerd').setAttribute('aria-pressed', String(mode === 'nerd'));
+  syncInputsFromState();
+  render();
+})();
+</script>

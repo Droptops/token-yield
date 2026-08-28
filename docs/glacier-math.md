@@ -1,0 +1,348 @@
+# The Glacier Model — the version for the nerds
+
+*Build-vs-buy economics for LLM inference: power chips, token prices, dev cost, and the
+melting margin. Deterministic, month-start convention, continuous rates. Companion to
+[Two Gates and a Half-Life](https://claude.ai/code/artifact/aaa96ee8-841e-450f-90a1-52865e584372)
+(sector model of open-weight substitution) and
+[When Open Source Gets Cheap Enough](https://claude.ai/code/artifact/40c001e6-97f2-4796-bf2f-a538cfdf8142)
+(its plain-English version). This paper is the firm-level cash-flow instrument: given your
+volume, the chips, the power, and the people, when does self-hosting open models beat buying
+tokens — and for how long before the advantage melts?*
+
+Every number in this document is reproduced by `dashboard/verify.mjs` against the engine
+embedded in `index.html`. Nothing here is hand-computed.
+
+---
+
+## 0. TL;DR — the decision rule
+
+Self-hosting is a bet that a **melting margin** can pay off a **fixed toll** before it is gone.
+
+```
+BUILD  ⟺  Gate 1:  a(0) > 0                       (route at the margin)
+      AND  Gate 2:  G ≥ D + PV(capex) + PV(m) − PV(salvage)   (pay the toll)
+
+a(t) = c(t) − κ·ε(t)                    the per-token glacier margin
+G    = ∫₀^min(T,t*) a(t)·Q(t)·e^(−rt) dt   the harvestable glacier
+t*   = ln(c₀ / κε₀) / (λ + γ − μ)          the melt time
+```
+
+Gate 1 without Gate 2 is the **mid-size trap**: worth routing at the margin, not worth the
+fixed cost. Most mid-sized deployments live there.
+
+## 1. Symbols and units
+
+| Symbol | Meaning | Unit |
+|---|---|---|
+| `t` | time from decision date | yr |
+| `T` | horizon | yr |
+| `r` | discount rate, continuous | /yr |
+| `Q(t) = σ·Q₀·e^(gt)` | movable reference-token demand | Mtok/month |
+| `σ` | movable share of workload (open models can handle it) | – |
+| `g` | demand growth, continuous | /yr |
+| `p(t) = p₀·e^(−λt)` | frontier API blended price | $/Mtok |
+| `λ = ln 2 / t_half` | frontier price melt rate | /yr |
+| `p_o(t) = p_o₀·e^(−λ_o t)` | hosted open-weight price (per *open* token) | $/Mtok |
+| `κ ≥ 1` | quality multiplier: open tokens needed per reference token | – |
+| `c(t)` | comparator price per **reference** Mtok: `p(t)` or `κ·p_o(t)` | $/Mtok |
+| `N` | GPUs owned | – |
+| `h` | all-in cost per GPU slot (card + server share + install) | $ |
+| `D` | one-time dev/integration cost | $ |
+| `m` | ongoing MLOps + maintenance | $/yr |
+| `s(t) = s₀·e^(μt)` | effective output tokens/sec per GPU | tok/s |
+| `μ` | serving + open-model efficiency gain on owned hardware | /yr |
+| `u ∈ (0,1]` | utilization: busy fraction of powered time | – |
+| `w` | server power per GPU slot, drawn whenever on | kW |
+| `φ` | PUE | – |
+| `e(t) = e₀·e^(γt)` | electricity price | $/kWh |
+| `γ` | electricity escalation — **the upward force vector** | /yr |
+| `ε(t)` | electricity cost per open token served | $/Mtok |
+| `δ` | hardware market-value decay | /yr |
+| `v` | value realized per reference Mtok (Token Yield numerator) | $/Mtok |
+
+Constants: `Y = 31,557,600 s/yr` (365.25 d), `8,766 h/yr`, month = `Y/12 s = 730.5 h`.
+
+## 2. Assumptions (and which way each one biases)
+
+1. **Deterministic exponential paths** for prices, demand, electricity, efficiency. No
+   volatility, no option value of waiting. *Biases toward building* (waiting has value when
+   λ is uncertain).
+2. **Month-start pricing convention**: month `i` spans `t_i = i/12`; all of month `i`'s
+   volume is charged at month-start prices and discounted at `e^(−r·t_i)`. Overstates both
+   paths' PV by the same second-order factor `(x/12)/(1−e^(−x/12))` per rate `x`; the
+   *comparison* is nearly unbiased.
+3. **Idle power is paid.** The fleet draws `N·w·φ` kW every hour whether busy or not; only
+   the busy fraction `u` produces tokens. This is why `u` sits in ε's denominator. *Biases
+   against building* at low utilization — honestly.
+4. **Only the movable share σ competes.** Tokens open models cannot serve are bought on
+   both paths and cancel out of the comparison. σ is the block (γ→0) approximation of the
+   heterogeneous-substitutability curve in *Two Gates* §2 — see §7.
+5. **Quality parity via κ**: the open model needs κ reference-equivalent tokens per
+   frontier token's outcome. Scalar, workload-averaged. *Optimistic for agentic chains,
+   pessimistic for extraction.*
+6. **Fleet purchased in tranches** as demand arrives ("staged", the default), each tranche
+   at price `h` (no hardware deflation on later tranches — *biases against building* under
+   growth), salvaging at `h·e^(−δ(T−t_buy))`. "Upfront" mode (fleet sized at t=0 for
+   horizon peak) exists for closed-form comparability.
+7. **Overflow above capacity is bought at the comparator price** — the hybrid is built in.
+8. **No terminal value beyond salvage**; the option to keep operating past T is ignored.
+   *Biases against building.*
+9. **λ is exogenous.** Defensive pricing (frontier cuts in response to migration) makes λ
+   endogenous and *slows* the sector melt — see *Two Gates* §4. In this model a larger λ
+   always shrinks your glacier: the incumbent's price cuts are a brake on your build case.
+
+## 3. The BUY path
+
+Monthly cost is `c_i·q_i` with `c_i = c₀·e^(−λ_c t_i)`, `q_i = σQ₀·e^(g t_i)`. With
+`ρ = e^((g−λ_c−r)/12)`, the exact discounted sum over `M = 12T` months is geometric:
+
+```
+PV_buy = c₀·σQ₀·(1 − ρ^M)/(1 − ρ)          [ = c₀·σQ₀·M when ρ = 1 ]
+```
+
+Continuous check (the engine's sum converges to this as steps shrink):
+
+```
+PV_buy^cont = c₀·σQ₀ᵧ · (1 − e^(−(λ_c+r−g)T)) / (λ_c + r − g)      Q₀ᵧ = 12·σQ₀
+```
+
+with the removable singularity `λ_c + r − g → 0` giving `c₀·σQ₀ᵧ·T`. For `T → ∞` this
+converges iff `λ_c + r > g`. Verified: `verify.mjs` vector B matches the geometric form to
+1e-12 relative.
+
+## 4. The BUILD path
+
+**Electricity per token.** One GPU-hour consumes `w·φ` kWh and produces `3600·s(t)·u`
+tokens. Therefore
+
+```
+ε(t) = w·φ·e(t) / (3600·s(t)·u)   $/token  =  (w·φ·e₀ / (3600·s₀·u)) · e^((γ−μ)t)
+ε₀ = w·φ·e₀ / (3600·s₀·u) · 10⁶   $/Mtok (open tokens)
+```
+
+Dimensional check: `kW·(kWh/kW·h)·($/kWh) / (tok/h) = $/tok`. At central defaults
+(`w=1.3, φ=1.3, e₀=$0.11, s₀=600 tok/s, u=0.5`): **ε₀ = $0.172 per million open tokens**
+— matching the engine's `epsilon0()` exactly. Electricity moves at net rate `γ − μ`:
+escalation pushes up, efficiency on your own metal pushes down.
+
+**Fleet.** Capacity per GPU-month is `s(t)·u·(Y/12)` tokens. Staged purchasing:
+`N_i = max(N_{i−1}, ⌈κq_i / cap_i⌉)`, each increment paid at month `i` and salvaged from
+its own purchase date. Fleet electricity is paid on **all** owned GPUs (assumption 3), so
+early oversizing under `upfront` mode is genuinely expensive — the staircase in the
+dashboard's race chart is this.
+
+**Totals.**
+
+```
+PV_build = D + PV(capex) + Σᵢ e^(−r tᵢ)·[ N_i·w·φ·730.5·e(t_i) + m/12 + c_i·overflow_i ] − PV(salvage)
+NPV_adv  = PV_buy − PV_build          BUILD ⟺ NPV_adv ≥ 0
+```
+
+Break-even month: first `i` where cumulative discounted BUY ≥ cumulative discounted BUILD
+(D and capex land when incurred; salvage credits at the final month).
+
+## 5. Break-even structure
+
+- **Max dev cost.** D enters additively: `D_max = D + NPV_adv`. (Vector E: exact.)
+- **Min viable scale.** `NPV_adv(Q₀)` is increasing and step-wise (integer GPUs); the
+  engine log-bisects to the threshold `Q₀_min`. At central defaults vs the frontier API:
+  **≈ 18.3 B movable tokens/month**. Against hosted open-weights: **no scale suffices**
+  (see §10 — the capex per token alone exceeds the hosted margin).
+- **Break-even horizon** `T_be` solves `NPV_adv(T) = 0`; generally a root-find. Special
+  case `g = 0, γ = μ, λ_c = 0`: linear-in-T closed form
+  `T_be = (D + H − V) / (12σQ₀(c₀ − κε₀) − m)` per discounted-rate adjustment.
+- **Signs of sensitivities** (all verified in the dashboard's tornado):
+  `∂NPV_adv/∂λ < 0` (faster melt kills the build case), `∂/∂e₀ < 0`, `∂/∂γ < 0`,
+  `∂/∂u > 0`, `∂/∂s₀ > 0`, `∂/∂κ < 0`, `∂/∂D = −1`, `∂/∂h < 0`, `∂/∂m < 0`.
+
+## 6. The glacier equations
+
+**Margin (the glacier's thickness).** Per reference token, variable-cost basis:
+
+```
+a(t) = c(t) − κ·ε(t) = c₀·e^(−λ_c t) − κ·ε₀·e^((γ−μ)t)
+```
+
+**Melt time.** `a(t*) = 0` gives
+
+```
+t* = ln( c₀ / (κ·ε₀) ) / (λ_c + γ − μ)
+```
+
+| Case | Condition | Meaning |
+|---|---|---|
+| melts | `c₀ > κε₀`, `λ_c+γ−μ > 0` | margin open now, gone at t* |
+| never melts | `c₀ > κε₀`, `λ_c+γ−μ ≤ 0` | margin grows — harvest forever |
+| already melted | `c₀ ≤ κε₀`, `λ_c+γ−μ ≥ 0` | buying is cheaper per token from day one |
+| opens later | `c₀ ≤ κε₀`, `λ_c+γ−μ < 0` | margin negative now, turns positive at t* < 0 formula's root |
+
+Central defaults vs frontier: `t* = ln(5/0.198)/0.503 = 6.42 yr`. Vs hosted open-weights:
+`t* = ln(0.5/0.172)/0.503 = 2.12 yr`. (Vector C: closed form matches bisection to 1e-6.)
+
+**Glacier value (the harvestable volume).** Over `τ = min(T, t*)`:
+
+```
+G = σQ₀ᵧ ∫₀^τ [ c₀·e^(−λ_c t) − κε₀·e^((γ−μ)t) ] · e^((g−r)t) dt
+  = σQ₀ᵧ [ c₀·(1−e^(−(λ_c+r−g)τ))/(λ_c+r−g) − κε₀·(1−e^(−(r+μ−γ−g)τ))/(r+μ−γ−g) ]
+```
+
+each bracket collapsing to `·τ` at its removable singularity. The engine computes G as the
+month-sum over positive-margin months (identical convention to the cash flows; vector D:
+exact agreement), which also handles the sign cases without case analysis.
+
+**The decision rule restated.** `BUILD ⟺ G ≥ toll`, where
+`toll = D + PV(capex) + PV(m) − PV(salvage)`. G excludes fixed costs by construction;
+the toll collects all of them. At scaleup defaults: G = $484k vs toll = $1.12M — **Gate 2
+fails while Gate 1 passes.**
+
+## 7. Two gates, and the sector behind them
+
+This model's two gates are the cash-flow instantiation of *Two Gates and a Half-Life*:
+
+- **Gate 1 (marginal condition)** `a(0) > 0` ↔ Proposition 1's routing condition
+  `V·p_f·δ(σ*) = k`: route while the marginal token saves more than it costs to route.
+  Here the "marginal cost of routing" is the physical serving cost `κ·ε(t)` plus, at the
+  fleet boundary, the next GPU tranche.
+- **Gate 2 (participation)** `G ≥ toll` ↔ Proposition 2: realized savings at the optimum
+  must cover the fixed cost. Their `F` is this model's `D + PV(m)`; their marginal
+  integration cost `k·σ` shows up here as capex and power scaling with routed volume.
+- **σ here is a block share** — the `γ → 0` member of their `δ(s) = δ₀(1−s)^γ` family. If
+  your workload's substitutability decays steeply, their interior optimum σ* < 1 applies
+  and this model should be run at `σ = σ*`, not `σ = 1`.
+- **The melt law.** Sector-level, the frontier-priced pool decays as `G_pool = G₀e^(−mt/γ)`
+  with half-life `t½ = γ·ln2/m ≈ 4 yr` at their calibration. Firm-level, this model's `t*`
+  is your private copy of the same clock.
+- **Frontier price cuts slow the melt — both models agree on the sign.** There:
+  `∂τ/∂ln p_f = +1`, a 30% cut moves ≈4.6 pp of workload back to frontier and stretches
+  the half-life 4.0 → 5.9 yr. Here: `∂t*/∂p₀ > 0` and `∂G/∂p₀ > 0` — every frontier price
+  cut shortens your harvest window and shrinks the prize. **The cheaper the API gets, the
+  weaker the case for owning metal — and the API is getting cheaper on schedule.** Anyone
+  extrapolating self-hosting from open-model capability alone is missing the lever the
+  incumbent still holds.
+
+## 8. Force vectors on Token Yield
+
+Token Yield `y = v / (cost per Mtok)`, value realized per dollar of token spend.
+
+**Buying:** `d ln y_buy/dt = +λ_c`. At λ = 0.69/yr, the buyer's yield doubles yearly for
+free. This is the down-escalator the build case races against.
+
+**Building:** all-in cost = amortization (fixed) + MLOps (fixed) + electricity (moving at
+`γ − μ`). With electricity share `s_E(t)` of build cost:
+
+```
+d ln y_build/dt = (μ − γ)·s_E(t) + (growth dilution of fixed costs)
+```
+
+**The downward force vector, quantified.** Rising electricity drags build-side yield at
+rate `γ·s_E`. At central defaults `s_E ≈ 3.7%` (scaleup) to `8.5%` (enterprise), γ = 6%/yr:
+**the drag is 0.2–0.5%/yr**. It is real, it compounds, and it is *two orders of magnitude
+smaller* than the λ ≈ 69%/yr tailwind the buyer rides. Electricity **price** cannot decide
+this decision; it can only nibble it.
+
+**Where electricity actually bites** (from *From Delivered Power to Token Price*, s_e ≈
+0.085): the **capacity channel**. `∂ln Y/∂ln e = −s_e ≈ −0.085`, but
+`∂ln Y/∂ln E_delivered = +1/ε` in the power-limited regime — 4× to 24× stronger for any
+plausible demand elasticity. For a self-hoster the firm-level analog is blunt: if you
+cannot get megawatts (or rack power at your colo), `N` is capped, capacity binds, overflow
+is bought at `c(t)`, and the glacier goes unharvested regardless of its size. **Watch the
+megawatts, not the $/kWh.** And note the macro feedback: the AI buildout is itself a
+driver of γ — token demand exports a cost externality onto its own input.
+
+## 9. The discrete engine (what the dashboard actually computes)
+
+State per month `i ∈ [0, M)`, `t_i = i/12`; all annual rates enter as `e^(x/12)` monthly
+factors; month-start prices × month volume; discount `e^(−r t_i)`.
+
+```
+q_i        = σQ₀·G^i            G = e^(g/12)          movable ref Mtok
+p_i        = p₀·L^i             L = e^(−λ/12)         $/ref Mtok
+pO_i       = p_o₀·Lo^i          Lo = e^(−λ_o/12)      $/open Mtok
+c_i        = frontier ? p_i : κ·pO_i                  $/ref Mtok
+e_i        = e₀·Γ^i             Γ = e^(γ/12)          $/kWh
+cap/GPU_i  = s₀·e^(μ t_i)·u·(Y/12)/10⁶                open Mtok
+N_i        = staged: max(N_{i−1}, ⌈κq_i/capGPU_i⌉)  · tranche capex N_i−N_{i−1} at h
+buy_i      = c_i·q_i
+elec_i     = N_i·w·φ·730.5·e_i
+over_i     = max(0, κq_i − N_i·capGPU_i)/κ · c_i
+build_i    = elec_i + m/12 + over_i (+ tranche capex)
+salvage    = Σ_tranches n_k·h·e^(−δ(T−t_k)), credited at i = M−1, discounted e^(−rT)
+```
+
+Outputs: `npvBuy`, `npvBuild`, `npvAdvantage`, `breakEvenMonth`, per-token series
+(including the intuition-only straight-line amortized all-in), Token Yield series, melt
+analytics, min viable scale, D_max, tornado (±30% one-at-a-time).
+
+**Verification** (`node dashboard/verify.mjs`, 13 checks, all machine-precision):
+A. constant world vs exact closed form; B. exponential world vs exact geometric sums;
+C. t* closed form vs bisection; D. glacier value vs independent sum; E. `D_max` identity;
+F. staged ≤ upfront and staged-covers-demand invariants; plus σ-equivalence
+(`σ=0.5 ≡ Q₀/2`).
+
+## 10. Default parameters (Aug 2026, knowledge-based — verify before deciding)
+
+| Param | Low | Central | High | Note |
+|---|---|---|---|---|
+| `h` $/GPU slot | 22,000 | **32,000** | 45,000 | H100-class all-in incl. server share; B200-class at the high end |
+| `w` kW/slot | 1.0 | **1.3** | 1.6 | 8-GPU HGX ≈ 10.2 kW ⇒ ~1.3/slot |
+| `φ` PUE | 1.15 | **1.3** | 1.5 | hyperscale low, retail colo high |
+| `s₀` tok/s/GPU | 250 | **600** | 2,500 | 70B-dense latency-bound low; MoE/batch-heavy high |
+| `u` | 0.3 | **0.5** | 0.8 | peaky SaaS low; batch pipelines high |
+| `μ` /yr | 0.10 | **0.25** | 0.50 | serving-stack + open-model gains on fixed hardware |
+| `e₀` $/kWh | 0.07 | **0.11** | 0.16 | US industrial→commercial; colo all-in equivalent higher |
+| `γ` /yr | 0.03 | **0.06** | 0.10 | 2024–26 escalation, datacenter-heavy regions high |
+| `p₀` $/Mtok | 2 | **5** | 12 | frontier blended in/out |
+| `λ` /yr | 0.35 | **0.69** | 1.4 | 24-, 12-, 6-month halving; fixed-capability declines run faster than frontier-tier |
+| `p_o₀` $/Mtok | 0.2 | **0.5** | 1.0 | hosted open-weight, strong open model |
+| `κ` | 1.0 | **1.15** | 1.5 | workload-dependent; agentic chains worse |
+| `D` $ | 100k | **250k** | 600k | 1–3 eng × 3–6 mo loaded |
+| `m` $/yr | 120k | **240k** | 600k | 0.5–2 FTE + tooling |
+| `δ` /yr | 0.30 | **0.45** | 0.60 | GPU resale decay (A100 history) |
+| `r` /yr | 0.08 | **0.12** | 0.20 | WACC-ish |
+| `g` /yr | 0 | **0.25–0.60** | 1.0 | archetype-dependent |
+
+Sanity: `ε₀ = $0.172/M open tok` at central values — far below hosted-open prices
+($0.2–1.0/M), i.e. electricity is a small share of serving cost; capex + people dominate.
+Consistent with the companion's s_e ≈ 0.085 at the provider level.
+
+## 11. Worked examples (engine output, `scratchpad → verify.mjs` reproducible)
+
+**Scaleup** — 5 B movable tok/mo, g=40%/yr, D=$250k, m=$240k/yr, T=3, r=12%:
+
+| vs Frontier ($5/M, 12-mo halving) | vs Hosted open ($0.50/M·κ) |
+|---|---|
+| Gate 1 **PASS**: t* = 6.4 yr | Gate 1 PASS: t* = 2.1 yr |
+| Gate 2 **FAIL**: G = $484k < toll = $1.12M | Gate 2 FAIL: G = $22k ≪ $1.12M |
+| NPV_adv = **−$636k** · break-even: never | NPV_adv = −$1.10M |
+| Min viable scale ≈ 18.3 B tok/mo | no scale suffices |
+
+The mid-size trap, exactly: the margin is open for 6+ years, and it still can't pay a
+$1.1M toll out of a $25k/month API bill.
+
+**Enterprise** — 50 B movable tok/mo, g=25%/yr, D=$400k, m=$480k/yr:
+
+| vs Frontier | vs Hosted open |
+|---|---|
+| Gate 1 PASS · Gate 2 **PASS**: G = $4.12M > toll = $3.53M | Gate 2 FAIL: G = $200k |
+| NPV_adv = **+$591k** · break-even month 27 · fleet grows to 73 GPUs | NPV_adv = −$3.34M |
+
+Verdict: **it depends** — building beats the frontier API, but *renting the same open
+model* beats building by $3.3M. Self-hosting only wins outright when APIs are off the
+table (data residency, compliance, latency) or when your utilization and throughput reach
+provider grade (`u → 0.8, s₀ → 2,500` flips it — try it in the dashboard).
+
+## 12. Limitations
+
+- κ is a scalar; substitutability is a curve (*Two Gates* γ). Both are unobservable today
+  — pick them, and say you picked them.
+- Deterministic paths: no λ volatility, hence no option value of waiting; the model will
+  recommend building slightly too eagerly near the boundary.
+- No defensive-pricing endogeneity: λ is your assumption, but the incumbent moves it in
+  response to exactly the migration this model recommends.
+- Integer-GPU steps make thresholds locally fuzzy (reported ~2 s.f.).
+- No latency/SLA constraints, no data-gravity value, no compliance premium — all of which
+  are *reasons to build at negative NPV_adv*, and they belong in the verdict as
+  qualitative overrides, not in this arithmetic.
+
+*Analytical work, not investment advice. All defaults are Aug-2026 knowledge-based
+estimates; plug in your own numbers. Figures reproduced by `dashboard/verify.mjs`.*

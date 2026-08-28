@@ -1,0 +1,170 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\newtheorem{prop}{Proposition}
+\newtheorem*{rule*}{Decision rule}
+\title{The Glacier Model:\\ \large Power chips, token prices, dev cost, and the melting margin\\
+of self-hosted open-weight inference}
+\author{Manny Villegas}
+\date{August 2026 \\ \small Working paper --- companion to \emph{Two Gates and a Half-Life},
+\emph{Deflating Token Yield},\\ \small and \emph{From Delivered Power to Token Price}}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A firm buying LLM inference by the token can instead buy GPUs, pay for power, and serve an
+open-weight model itself. The per-token saving is real and large today, but it is a
+\emph{melting} asset: API prices fall exponentially while electricity drifts upward, and
+capturing the saving requires paying a fixed toll of integration labor and hardware. We
+give the deterministic cash-flow model: closed forms for both paths, a melt time $t^\ast$
+and a harvestable glacier value $G$, a two-gate decision rule that separates the marginal
+condition from participation, and the force-vector decomposition of Token Yield under
+rising electricity prices. Calibrated to August-2026 estimates, the participation gate
+binds near $1.5$--$2\times 10^{10}$ movable tokens per month against frontier APIs, and is
+essentially never cleared against hosted open-weight serving absent provider-grade
+utilization or data-residency constraints. Every numerical claim is reproduced by
+\texttt{dashboard/verify.mjs} in the accompanying repository.
+\end{abstract}
+
+\section{Setup}
+Time $t$ in years, horizon $T$, continuous discount rate $r$. Movable demand (the share
+$\sigma$ of workload open models can serve) is $Q(t)=\sigma Q_0 e^{gt}$ reference tokens
+per year. The frontier API charges $p(t)=p_0 e^{-\lambda t}$ per token
+($\lambda=\ln 2/t_{1/2}$); hosted open-weight serving charges $p_o(t)=p_{o0}e^{-\lambda_o t}$
+per \emph{open} token. Quality parity requires $\kappa\ge 1$ open tokens per reference
+token, so the comparator price per reference token is $c(t)=p(t)$ or $\kappa p_o(t)$.
+
+A GPU slot costs $h$ all-in, draws $w$ kW at PUE $\varphi$ \emph{whenever powered}, and
+serves $s(t)=s_0e^{\mu t}$ tokens/s at utilization $u\in(0,1]$. Electricity costs
+$e(t)=e_0e^{\gamma t}$ per kWh. Dev cost $D$ is paid once; MLOps runs at $m$ per year;
+hardware value decays at $\delta$, salvaging at $he^{-\delta(T-t_{\mathrm{buy}})}$.
+
+\paragraph{Electricity per token.} One GPU-hour consumes $w\varphi$ kWh and produces
+$3600\,s(t)\,u$ tokens:
+\begin{equation}
+\varepsilon(t)=\frac{w\varphi\,e(t)}{3600\,s(t)\,u}
+=\varepsilon_0\,e^{(\gamma-\mu)t},\qquad
+\varepsilon_0=\frac{w\varphi e_0}{3600\,s_0 u}.
+\label{eq:eps}
+\end{equation}
+Idle power is paid, which is why $u$ sits in the denominator. At central calibration
+$\varepsilon_0=\$0.172$ per million open tokens.
+
+\section{The two paths}
+\paragraph{Buy.} $\mathrm{PV}_{\mathrm{buy}}
+=\int_0^T c(t)Q(t)e^{-rt}\,dt
+= c_0 Q_0^{\sigma}\,\frac{1-e^{-(\lambda_c+r-g)T}}{\lambda_c+r-g}$,
+with $Q_0^\sigma=\sigma Q_0$ and the removable singularity
+$\lambda_c+r-g\to0$ giving $c_0Q_0^\sigma T$; convergence as $T\to\infty$ iff
+$\lambda_c+r>g$. The implementation uses the exact monthly geometric sum
+$c_0 Q_0^{\sigma,\mathrm{mo}}(1-\rho^{M})/(1-\rho)$, $\rho=e^{(g-\lambda_c-r)/12}$,
+$M=12T$ (month-start convention).
+
+\paragraph{Build.} Fleet tranches $N_i=\max\!\big(N_{i-1},\lceil \kappa q_i/\mathrm{cap}_i\rceil\big)$
+purchased when demand arrives; capacity per GPU-month $\mathrm{cap}_i = s(t_i)u\,Y/12$;
+overflow above capacity is bought at $c(t)$. Then
+\begin{equation}
+\mathrm{PV}_{\mathrm{build}} = D+\mathrm{PV}(\mathrm{capex})
++\int_0^T\!\Big[N(t)w\varphi\,\bar h\,e(t)+m+c(t)\,\mathrm{over}(t)\Big]e^{-rt}dt
+-\mathrm{PV}(\mathrm{salvage}),
+\end{equation}
+with $\bar h=8766$ h/yr. $\mathrm{NPV_{adv}}=\mathrm{PV_{buy}}-\mathrm{PV_{build}}$;
+build iff $\mathrm{NPV_{adv}}\ge0$. $D$ enters additively, so the maximum justifiable dev
+cost is $D_{\max}=D+\mathrm{NPV_{adv}}$.
+
+\section{The glacier equations}
+The per-reference-token margin on a variable-cost basis is
+\begin{equation}
+a(t)=c(t)-\kappa\varepsilon(t)=c_0e^{-\lambda_c t}-\kappa\varepsilon_0e^{(\gamma-\mu)t}.
+\end{equation}
+
+\begin{prop}[Melt time]
+If $c_0>\kappa\varepsilon_0$ and $\lambda_c+\gamma-\mu>0$, the margin closes at
+\begin{equation}
+t^\ast=\frac{\ln\!\big(c_0/(\kappa\varepsilon_0)\big)}{\lambda_c+\gamma-\mu}.
+\end{equation}
+If $\lambda_c+\gamma-\mu\le0$ the margin never melts; if $c_0\le\kappa\varepsilon_0$ it is
+already melted (or opens later when $\lambda_c+\gamma-\mu<0$).
+\end{prop}
+
+\begin{prop}[Glacier value]
+Over $\tau=\min(T,t^\ast)$, the discounted harvestable margin is
+\begin{equation}
+G=\sigma Q_0\!\left[c_0\frac{1-e^{-(\lambda_c+r-g)\tau}}{\lambda_c+r-g}
+-\kappa\varepsilon_0\frac{1-e^{-(r+\mu-\gamma-g)\tau}}{r+\mu-\gamma-g}\right],
+\end{equation}
+each bracket collapsing to $\cdot\,\tau$ at its removable singularity.
+\end{prop}
+
+\begin{rule*}[Two gates]
+\emph{Gate 1 (marginal): $a(0)>0$. Gate 2 (participation):}
+\begin{equation}
+G \;\ge\; \underbrace{D+\mathrm{PV}(\mathrm{capex})+\mathrm{PV}(m)-\mathrm{PV}(\mathrm{salvage})}_{\text{the toll}}.
+\end{equation}
+Gate 1 without Gate 2 is the mid-size trap: worth routing at the margin, not worth the
+fixed cost. This is the cash-flow instantiation of Propositions 1--2 of \emph{Two Gates
+and a Half-Life}; the block share $\sigma$ is the $\gamma_{\mathrm{sub}}\to0$ member of its
+heterogeneous-substitutability family.
+\end{rule*}
+
+Note the sign of $\partial t^\ast/\partial p_0>0$ and $\partial G/\partial p_0>0$:
+\textbf{frontier price cuts shrink the glacier and shorten the harvest} --- the incumbent's
+routine price cuts are also its defense against self-hosting, agreeing in sign with the
+melt-law feedback of the companion paper (a 30\% cut there returns $\approx4.6$pp of
+workload and stretches the sector half-life from $4.0$ to $5.9$ years).
+
+\section{Force vectors on Token Yield}
+Token Yield is $y=v/\text{cost}$. Buying: $d\ln y_{\mathrm{buy}}/dt=+\lambda_c$
+($\approx69\%/$yr at central calibration). Building, with electricity share
+$s_E(t)$ of all-in cost:
+\begin{equation}
+\frac{d\ln y_{\mathrm{build}}}{dt}=(\mu-\gamma)\,s_E(t)\;+\;\text{(fixed-cost dilution)}.
+\end{equation}
+The \emph{downward force vector} of rising electricity is $\gamma s_E \approx
+0.2$--$0.5\%$/yr at $s_E=3.7$--$8.5\%$, $\gamma=6\%$/yr: real, compounding, and two orders
+of magnitude smaller than the buyer's tailwind $\lambda_c$. Electricity \emph{price} nibbles
+the decision; electricity \emph{capacity} can veto it: in the power-limited regime the
+companion calibration gives $\partial\ln Y/\partial\ln e=-s_e\approx-0.085$ against
+$\partial\ln Y/\partial\ln E_{\mathrm{delivered}}=+1/\epsilon$, a $4$--$24\times$ stronger
+channel. Watch the megawatts, not the \$/kWh.
+
+\section{Calibration (August 2026, knowledge-based)}
+$h=\$32$k/slot, $w=1.3$ kW, $\varphi=1.3$, $s_0=600$ tok/s, $u=0.5$, $\mu=0.25$,
+$e_0=\$0.11$/kWh, $\gamma=0.06$, $p_0=\$5$/Mtok, $\lambda=0.693$ (12-month halving),
+$p_{o0}=\$0.50$/Mtok, $\kappa=1.15$, $D=\$250$k, $m=\$240$k/yr, $\delta=0.45$, $r=0.12$,
+$T=3$ yr. Then $\varepsilon_0=\$0.172$/M open tokens; against the frontier,
+$t^\ast=6.4$ yr; against hosted open-weights, $t^\ast=2.1$ yr.
+
+\begin{table}[h]\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{Scaleup (5B tok/mo)} & \multicolumn{2}{c}{Enterprise (50B tok/mo)}\\
+ & vs frontier & vs hosted-open & vs frontier & vs hosted-open\\
+\midrule
+Gate 1 (margin) & pass & pass & pass & pass\\
+Glacier $G$ & \$484k & \$22k & \$4.12M & \$200k\\
+Toll & \$1.12M & \$1.12M & \$3.53M & \$3.53M\\
+Gate 2 (participation) & fail & fail & \textbf{pass} & fail\\
+$\mathrm{NPV_{adv}}$ & $-\$636$k & $-\$1.10$M & $+\$591$k & $-\$3.34$M\\
+Break-even & never & never & month 27 & never\\
+\bottomrule
+\end{tabular}
+\caption{Engine output at central calibration ($g=40\%$, $D=\$250$k, $m=\$240$k for the
+scaleup; $g=25\%$, $D=\$400$k, $m=\$480$k for the enterprise). Minimum viable scale vs the
+frontier is $\approx18$B movable tokens/month (scaleup settings) to $\approx37$B
+(enterprise settings); vs hosted open-weights no scale suffices at central utilization.}
+\end{table}
+
+\section{Limitations}
+Deterministic paths (no option value of waiting); scalar $\kappa$ for a substitutability
+curve; exogenous $\lambda$ despite the defensive-pricing feedback; integer-GPU thresholds;
+no latency, data-gravity, or compliance terms --- these last are reasons to build at
+negative $\mathrm{NPV_{adv}}$ and belong as qualitative overrides. Calibration is
+order-of-magnitude, knowledge-based as of August 2026.
+
+\vspace{1em}\noindent\emph{Analytical work, not investment advice. Reproduction:
+\texttt{node dashboard/verify.mjs}; interactive:
+\texttt{index.html} (plain and nerd modes).}
+\end{document}
