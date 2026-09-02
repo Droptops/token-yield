@@ -21,6 +21,7 @@
     --s-build: #2a78d6;       /* BUILD = ice blue */
     --s-frontier: #eb6834;    /* frontier API = the sun */
     --s-open: #1baf7a;        /* hosted open-weights */
+    --s-provider: #8757c7;    /* managed inference provider basket */
     /* status (fixed) */
     --st-good: #0ca30c; --st-good-text: #006300;
     --st-warn: #fab219; --st-serious: #ec835a; --st-critical: #d03b3b;
@@ -43,6 +44,7 @@
       --s-build: #3987e5;
       --s-frontier: #d95926;
       --s-open: #199e70;
+      --s-provider: #a77ae8;
       --st-good-text: #0ca30c;
       --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
     }
@@ -63,6 +65,7 @@
     --s-build: #3987e5;
     --s-frontier: #d95926;
     --s-open: #199e70;
+    --s-provider: #a77ae8;
     --st-good-text: #0ca30c;
     --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
   }
@@ -258,9 +261,10 @@
           <select id="in-comparator">
             <option value="frontier">Frontier</option>
             <option value="hostedOpen">Open, hosted</option>
+            <option value="inferenceCloud">Inference clouds</option>
           </select>
         </div>
-        <p class="ctl-note simple-only">“Frontier API” is a top closed model’s price. “Hosted open-weights” is renting the same open model you would self-host — the toughest honest comparison.</p>
+        <p class="ctl-note simple-only">“Frontier” is a top closed model. “Open, hosted” is the commodity lower bound. “Inference clouds” is an apples-to-apples Fireworks AI, Baseten, and DeepInfra rate-card basket.</p>
       </div>
 
       <div class="ctl-group">
@@ -286,6 +290,15 @@
         <div class="ctl nerd-only"><label for="in-pOpen0">Hosted open $/M <span class="sym">p₀ᵒ</span></label><input id="in-pOpen0" type="number" min="0" step="any" value="0.30"></div>
         <div class="ctl nerd-only"><label for="in-lambdaOpen">Open melt /yr <span class="sym">λᵒ</span></label><input id="in-lambdaOpen" type="number" step="any" value="0.462"></div>
         <div class="ctl nerd-only"><label for="in-kappa">Quality multiplier <span class="sym">κ</span></label><input id="in-kappa" type="number" min="0.5" step="any" value="1.15"></div>
+      </div>
+
+      <div class="ctl-group nerd-only">
+        <h3>Inference clouds</h3>
+        <p class="ctl-note">Equal-weight DeepSeek V4 Pro 0813 basket · public standard-tier rates · 2026-09-01.</p>
+        <div class="ctl"><label for="in-providerOutputShare">Output share % <span class="sym">θ</span></label><input id="in-providerOutputShare" type="number" min="0" max="100" step="any" value="25"></div>
+        <div class="ctl"><label for="in-providerCacheHit">Input cache-hit % <span class="sym">χ</span></label><input id="in-providerCacheHit" type="number" min="0" max="100" step="any" value="25"></div>
+        <div class="ctl"><label for="in-providerDiscount">Contract discount % <span class="sym">d</span></label><input id="in-providerDiscount" type="number" min="0" max="100" step="any" value="0"></div>
+        <div class="ctl"><label for="in-lambdaProvider">Provider melt /yr <span class="sym">λᵖ</span></label><input id="in-lambdaProvider" type="number" min="0" step="any" value="0.462"></div>
       </div>
 
       <div class="ctl-group">
@@ -356,6 +369,16 @@
         <div class="eq-strip nerd-only"><span class="eq" id="eq-glacier"></span></div>
       </div>
 
+      <div class="card nerd-only" id="provider-basket-card">
+        <header>
+          <h2>Managed inference basket</h2>
+          <span class="sub">same model, same workload, three public rate cards</span>
+        </header>
+        <div class="data-table open" id="t-provider"></div>
+        <div class="eq-strip"><span class="eq" id="eq-provider"></span></div>
+        <p class="ctl-note">The center line is an equal-weight basket. The purple band is the cheapest-to-most-expensive public quote under the same input/output/cache mix. Contract discount is an explicit scenario input because negotiated rates are not public.</p>
+      </div>
+
       <div class="card">
         <header>
           <h2>Race to break even</h2>
@@ -394,11 +417,12 @@
       <footer class="site">
         Deterministic model, month-start convention, continuous rates. Full derivations:
         <a href="docs/glacier-math.md">nerd version</a> ·
-        <a href="docs/glacier-plain.md">plain version</a>.
+        <a href="docs/glacier-plain.md">plain version</a> ·
+        <a href="docs/inference-provider-curve.md">provider curve</a>.
         Companion pieces: <a href="https://claude.ai/code/artifact/aaa96ee8-841e-450f-90a1-52865e584372">Two Gates and a Half-Life</a> ·
         <a href="https://claude.ai/code/artifact/40c001e6-97f2-4796-bf2f-a538cfdf8142">When Open Source Gets Cheap Enough</a> ·
         <a href="https://claude.ai/code/artifact/569e7a6d-2292-4403-90e8-c522772700af">Melt Rate</a> (sector model).
-        Defaults are Aug-2026 knowledge-based estimates — plug in your own numbers.
+        Infrastructure defaults are Aug-2026 estimates; provider rates are a Sep-1-2026 public snapshot — plug in your own numbers.
       </footer>
     </main>
   </div>
@@ -429,6 +453,54 @@ const GLACIER = (() => {
   const SECONDS_PER_YEAR = 31557600;   // 365.25 * 86400
   const HOURS_PER_YEAR   = 8766;       // 365.25 * 24
 
+  // Same-model public serverless quotes captured 2026-09-01. Keeping the
+  // rate card in the engine makes the provider curve reproducible rather
+  // than hiding a pre-blended sticker price in a default.
+  const PROVIDER_RATE_CARD = Object.freeze([
+    Object.freeze({ key: 'fireworks', name: 'Fireworks AI', model: 'DeepSeek V4 Pro 0813', input: 1.32, cachedInput: 0.044, output: 3.96, weight: 1 / 3 }),
+    Object.freeze({ key: 'baseten', name: 'Baseten', model: 'DeepSeek V4 Pro 0813', input: 1.32, cachedInput: 0.132, output: 3.96, weight: 1 / 3 }),
+    Object.freeze({ key: 'deepinfra', name: 'DeepInfra', model: 'DeepSeek V4 Pro 0813', input: 1.30, cachedInput: 0.10, output: 2.60, weight: 1 / 3 }),
+  ]);
+  const PROVIDER_RATE_CARD_AS_OF = '2026-09-01';
+
+  const clamp01 = x => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
+
+  // theta = output share of all billed tokens; chi = cached share of input.
+  // b_j = (1-d)[(1-theta)((1-chi)I_j + chi C_j) + theta O_j]
+  function providerBasket(P) {
+    const theta = clamp01(P.providerOutputShare == null ? 0.25 : P.providerOutputShare);
+    const chi = clamp01(P.providerCacheHit == null ? 0.25 : P.providerCacheHit);
+    const discount = clamp01(P.providerDiscount == null ? 0 : P.providerDiscount);
+    const providers = PROVIDER_RATE_CARD.map(row => {
+      const effectiveInput = (1 - chi) * row.input + chi * row.cachedInput;
+      const blended = (1 - discount) * ((1 - theta) * effectiveInput + theta * row.output);
+      return { ...row, effectiveInput, blended };
+    });
+    const weightTotal = providers.reduce((s, row) => s + row.weight, 0);
+    const blended = providers.reduce((s, row) => s + row.weight * row.blended, 0) / weightTotal;
+    return {
+      asOf: PROVIDER_RATE_CARD_AS_OF,
+      model: PROVIDER_RATE_CARD[0].model,
+      outputShare: theta,
+      cacheHit: chi,
+      discount,
+      providers,
+      blended,
+      low: Math.min(...providers.map(row => row.blended)),
+      high: Math.max(...providers.map(row => row.blended)),
+    };
+  }
+
+  function providerPriceAt(P, t) {
+    return providerBasket(P).blended * Math.exp(-P.lambdaProvider * t);
+  }
+
+  function comparatorMeltRate(P) {
+    if (P.comparator === 'hostedOpen') return P.lambdaOpen;
+    if (P.comparator === 'inferenceCloud') return P.lambdaProvider;
+    return P.lambda;
+  }
+
   // Default parameters: "scaleup" archetype; knowledge-based Aug-2026 values,
   // sources and low/central/high ranges in docs/glacier-math.md §9.
   const DEFAULTS = {
@@ -441,8 +513,12 @@ const GLACIER = (() => {
     lambda: 0.462,    // frontier list-price decline (/yr) = 18-month halving
     pOpen0: 0.30,     // hosted open-weight commodity tier ($/Mtok OPEN tokens)
     lambdaOpen: 0.462,// hosted open-weight price decline (/yr)
+    lambdaProvider: 0.462, // managed inference basket price decline (/yr)
+    providerOutputShare: 0.25, // output / (input + output) billed tokens
+    providerCacheHit: 0.25,    // cached fraction of input tokens
+    providerDiscount: 0.00,    // negotiated discount to public rate cards
     kappa: 1.15,      // open-model quality multiplier (open tokens per reference token)
-    comparator: 'frontier',  // 'frontier' | 'hostedOpen'
+    comparator: 'frontier',  // 'frontier' | 'hostedOpen' | 'inferenceCloud'
     fleetMode: 'staged',     // 'staged' | 'upfront' | 'manual'
     N: 8,             // GPU count when fleetMode='manual'
     h: 45000,         // all-in $ per GPU slot (server share + fabric + integration)
@@ -469,17 +545,26 @@ const GLACIER = (() => {
     // demand & prices per month; only the movable share is in play —
     // tokens open models can't handle are bought on both paths and cancel
     const Qbase = P.Q0m * (P.sigma == null ? 1 : P.sigma);
-    const q = [], pF = [], pO = [], eKwh = [], disc = [];
+    const provider = providerBasket(P);
+    const q = [], pF = [], pO = [], pProvider = [], pProviderLow = [], pProviderHigh = [], eKwh = [], disc = [];
     for (let i = 0; i < M; i++) {
       const t = tAt(i);
       q.push(Qbase * Math.exp(P.g * t));                 // movable reference Mtok
       pF.push(P.p0 * Math.exp(-P.lambda * t));           // $/Mtok reference
       pO.push(P.pOpen0 * Math.exp(-P.lambdaOpen * t));   // $/Mtok OPEN
+      pProvider.push(provider.blended * Math.exp(-P.lambdaProvider * t)); // $/Mtok OPEN
+      pProviderLow.push(provider.low * Math.exp(-P.lambdaProvider * t));
+      pProviderHigh.push(provider.high * Math.exp(-P.lambdaProvider * t));
       eKwh.push(P.e0 * Math.exp(P.gamma * t));           // $/kWh
       disc.push(Math.exp(-P.r * t));
     }
-    // comparator price per REFERENCE Mtok (hosted-open serves kappa x tokens)
-    const comp = q.map((_, i) => P.comparator === 'hostedOpen' ? pO[i] * P.kappa : pF[i]);
+    // Comparator price per REFERENCE Mtok. Both open-model buy paths need
+    // kappa open tokens for one reference-token-equivalent outcome.
+    const comp = q.map((_, i) => {
+      if (P.comparator === 'hostedOpen') return pO[i] * P.kappa;
+      if (P.comparator === 'inferenceCloud') return pProvider[i] * P.kappa;
+      return pF[i];
+    });
 
     const capPerGpuAt = t => P.s0 * Math.exp(P.mu * t) * P.u * secPerMonth / 1e6; // Mtok open/GPU/mo
 
@@ -544,7 +629,9 @@ const GLACIER = (() => {
       if (breakEvenMonth === null && cumBuy >= cumBuildShown) breakEvenMonth = i;
 
       rows.push({
-        i, t, q: q[i], pF: pF[i], pO: pO[i], comp: comp[i], N,
+        i, t, q: q[i], pF: pF[i], pO: pO[i],
+        pProvider: pProvider[i], pProviderLow: pProviderLow[i], pProviderHigh: pProviderHigh[i],
+        comp: comp[i], N,
         capOpen, selfServed, overflowRef,
         buyCost, elec, mlops, overflowCost, buildOps, capex: capexAt[i],
         eKwh: eKwh[i],
@@ -563,7 +650,7 @@ const GLACIER = (() => {
       rw.yieldBuild = P.vRef / rw.buildAllIn;
     }
 
-    return { P: { ...P }, M, Nfinal: Nseq[M - 1], Hnominal, capexPV, salvage, salvagePV, mlopsPV,
+    return { P: { ...P }, provider, M, Nfinal: Nseq[M - 1], Hnominal, capexPV, salvage, salvagePV, mlopsPV,
              rows, npvBuy, npvBuild, npvAdvantage, breakEvenMonth, amortMonthly };
   }
 
@@ -577,10 +664,15 @@ const GLACIER = (() => {
   // mode: 'melts' | 'never' | 'alreadyMelted' | 'opens'
   function meltTime(P) {
     const eps0 = epsilon0(P);
-    const c0 = P.comparator === 'hostedOpen' ? P.pOpen0 * P.kappa : P.p0;
-    const lam = P.comparator === 'hostedOpen' ? P.lambdaOpen : P.lambda;
+    const c0 = P.comparator === 'hostedOpen'
+      ? P.pOpen0 * P.kappa
+      : P.comparator === 'inferenceCloud'
+        ? providerBasket(P).blended * P.kappa
+        : P.p0;
+    const lam = comparatorMeltRate(P);
     const k = lam + P.gamma - P.mu;          // net melt rate (/yr)
     const ratio = c0 / (P.kappa * eps0);
+    if (!(ratio > 0)) return { tStar: 0, mode: 'alreadyMelted' };
     if (ratio <= 1) {
       if (k < 0) return { tStar: Math.log(ratio) / k, mode: 'opens' };
       return { tStar: 0, mode: 'alreadyMelted' };
@@ -596,23 +688,155 @@ const GLACIER = (() => {
     for (const rw of sim.rows) {
       const eps = eps0 * Math.exp((P.gamma - P.mu) * rw.t);
       const a = rw.comp - P.kappa * eps;      // $/ref Mtok
-      if (a > 0) G += Math.exp(-P.r * rw.t) * a * rw.q;
+      // Overflow is bought on both paths and produces no glacier margin.
+      const selfServedRef = Math.min(rw.q, rw.selfServed / P.kappa);
+      if (a > 0) G += Math.exp(-P.r * rw.t) * a * selfServedRef;
     }
     return G;
   }
 
-  // Minimum viable scale: log-bisect Q0m to zero NPV advantage (integer fleets
-  // make this a step function; result reported ~2 sig figs)
+  // Minimum viable scale: find the FIRST feasible crossing. Integer GPU ceilings
+  // make NPV a sawtooth, so a global bisection is invalid and can return a later
+  // crossing. Between fleet breakpoints NPV is linear/increasing in Q0; inspect
+  // the left side of every breakpoint, then bisect only inside that fixed-fleet band.
   function minViableScale(P) {
     const adv = Q0m => simulate({ ...P, Q0m }).npvAdvantage;
-    let lo = 1, hi = 1e8;
-    if (adv(hi) <= 0) return Infinity;
-    if (adv(lo) > 0) return 0;
-    for (let it = 0; it < 60; it++) {
-      const mid = Math.sqrt(lo * hi);
-      if (adv(mid) > 0) hi = mid; else lo = mid;
+    const loBound = 1, hiBound = 1e8;
+    if (adv(loBound) > 0) return 0;
+
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const secPerMonth = SECONDS_PER_YEAR / 12;
+    const sigma = P.sigma == null ? 1 : P.sigma;
+    const capPerGpuAt = t => P.s0 * Math.exp(P.mu * t) * P.u * secPerMonth / 1e6;
+
+    // A fractional fleet is a cost lower bound on an integer fleet when rates,
+    // costs, discounting, and depreciation are nonnegative. Its NPV advantage is
+    // therefore an upper bound on the attainable integer-fleet advantage. Use it
+    // to skip regions that provably cannot contain the first crossing and to prove
+    // no scale can work when even perfectly divisible hardware has nonpositive slope.
+    function relaxedStart() {
+      if (P.fleetMode === 'manual') return loBound;
+      const lam = comparatorMeltRate(P);
+      const c0 = P.comparator === 'hostedOpen'
+        ? P.pOpen0 * P.kappa
+        : P.comparator === 'inferenceCloud'
+          ? providerBasket(P).blended * P.kappa
+          : P.p0;
+      const valid = [P.Tyears, P.r, P.g, lam, c0, P.kappa, P.s0, P.u, P.mu,
+        P.h, P.wKw, P.pue, P.e0, P.gamma, P.D, P.mYr, P.delta, sigma]
+        .every(Number.isFinite)
+        && P.Tyears >= 0 && P.r >= 0 && c0 >= 0 && P.kappa > 0
+        && P.s0 > 0 && P.u > 0 && P.h >= 0 && P.wKw >= 0
+        && P.pue >= 0 && P.e0 >= 0 && P.D >= 0 && P.mYr >= 0
+        && P.delta >= 0 && sigma >= 0;
+      if (!valid) return loBound;
+
+      const hrsPerMonth = HOURS_PER_YEAR / 12;
+      const qFactor = [], discount = [], powerPerGpu = [];
+      let buyPVPerQ = 0, fixedPV = P.D;
+      for (let i = 0; i < M; i++) {
+        const t = i / 12;
+        const qf = sigma * Math.exp(P.g * t);
+        const di = Math.exp(-P.r * t);
+        qFactor.push(qf); discount.push(di);
+        powerPerGpu.push(P.wKw * P.pue * hrsPerMonth * P.e0 * Math.exp(P.gamma * t));
+        buyPVPerQ += di * c0 * Math.exp(-lam * t) * qf;
+        fixedPV += di * P.mYr / 12;
+      }
+
+      let capexPVPerQ = 0, salvagePVPerQ = 0, elecPVPerQ = 0;
+      if (P.fleetMode === 'upfront') {
+        const nPerQ = P.kappa * Math.max(...qFactor) / capPerGpuAt(0);
+        capexPVPerQ = nPerQ * P.h;
+        salvagePVPerQ = nPerQ * P.h * Math.exp(-P.delta * P.Tyears) * Math.exp(-P.r * P.Tyears);
+        for (let i = 0; i < M; i++) elecPVPerQ += discount[i] * nPerQ * powerPerGpu[i];
+      } else {
+        let nCur = 0;
+        for (let i = 0; i < M; i++) {
+          const t = i / 12;
+          const need = P.kappa * qFactor[i] / capPerGpuAt(t);
+          if (need > nCur) {
+            const add = need - nCur;
+            capexPVPerQ += discount[i] * add * P.h;
+            salvagePVPerQ += add * P.h * Math.exp(-P.delta * (P.Tyears - t)) * Math.exp(-P.r * P.Tyears);
+            nCur = need;
+          }
+          elecPVPerQ += discount[i] * nCur * powerPerGpu[i];
+        }
+      }
+
+      const slope = buyPVPerQ - capexPVPerQ - elecPVPerQ + salvagePVPerQ;
+      if (!(slope > 0)) return Infinity;
+      // Start infinitesimally below the relaxed crossing so the discrete search
+      // retains the boundary that could coincide with it despite float rounding.
+      return Math.max(loBound, fixedPV / slope * (1 - 1e-10));
     }
-    return hi;
+
+    function nextBreakpoint(q0) {
+      if (P.fleetMode === 'manual' || sigma <= 0) return Infinity;
+      let next = Infinity;
+      if (P.fleetMode === 'upfront') {
+        let peakFactor = 0;
+        for (let i = 0; i < M; i++) peakFactor = Math.max(peakFactor, Math.exp(P.g * i / 12));
+        const a = sigma * P.kappa * peakFactor / capPerGpuAt(0);
+        if (!(a > 0)) return Infinity;
+        let n = Math.ceil(q0 * a);
+        let boundary = n / a;
+        if (boundary <= q0 * (1 + 1e-12)) boundary = (n + 1) / a;
+        return boundary;
+      }
+      // Staged mode: every monthly ceil() is a potential tranche boundary.
+      // Some are redundant after the running max, but including them is safe.
+      for (let i = 0; i < M; i++) {
+        const t = i / 12;
+        const a = sigma * P.kappa * Math.exp(P.g * t) / capPerGpuAt(t);
+        if (!(a > 0)) continue;
+        let n = Math.ceil(q0 * a);
+        let boundary = n / a;
+        if (boundary <= q0 * (1 + 1e-12)) boundary = (n + 1) / a;
+        if (boundary < next) next = boundary;
+      }
+      return next;
+    }
+
+    let q = relaxedStart();
+    if (!isFinite(q) || q > hiBound) return Infinity;
+    for (let bands = 0; q < hiBound && bands < 250000; bands++) {
+      const bp = Math.min(hiBound, nextBreakpoint(q));
+      // Stay on the pre-jump fleet. At an exact mathematical boundary ceil(n)=n;
+      // the tiny inward offset avoids floating multiplication landing just above n.
+      const right = isFinite(bp) && bp < hiBound ? Math.max(q, bp * (1 - 1e-11)) : hiBound;
+      if (adv(right) >= 0) {
+        let lo = q, hi = right;
+        for (let it = 0; it < 70; it++) {
+          const mid = (lo + hi) / 2;
+          if (adv(mid) >= 0) hi = mid; else lo = mid;
+        }
+        return hi;
+      }
+      if (!isFinite(bp) || bp >= hiBound) break;
+      q = bp * (1 + 1e-11); // post-jump side of the next fleet band
+      if (adv(q) >= 0) return q;
+    }
+
+    // Pathological very-high-scale fallback after the breakpoint budget. It is
+    // deliberately labeled approximate by the UI's two-significant-figure display.
+    let prevQ = q, prevA = adv(prevQ);
+    const ratio = Math.pow(hiBound / Math.max(prevQ, 1), 1 / 8192);
+    for (let i = 0; i < 8192 && prevQ < hiBound; i++) {
+      const nextQ = Math.min(hiBound, prevQ * ratio);
+      const nextA = adv(nextQ);
+      if (prevA < 0 && nextA >= 0) {
+        let lo = prevQ, hi = nextQ;
+        for (let it = 0; it < 70; it++) {
+          const mid = (lo + hi) / 2;
+          if (adv(mid) >= 0) hi = mid; else lo = mid;
+        }
+        return hi;
+      }
+      prevQ = nextQ; prevA = nextA;
+    }
+    return Infinity;
   }
 
   // Max dev cost that still breaks even (D enters the NPV additively)
@@ -627,10 +851,20 @@ const GLACIER = (() => {
 
   // Tornado: +/-30% one-at-a-time; NPV-advantage deltas
   function tornado(P, base) {
+    const priceKeys = P.comparator === 'inferenceCloud'
+      ? [
+          ['lambdaProvider', 'Provider price melt rate λᵖ'],
+          ['providerOutputShare', 'Provider output share θ'],
+          ['providerCacheHit', 'Provider input cache-hit χ'],
+        ]
+      : P.comparator === 'hostedOpen'
+        ? [['lambdaOpen', 'Hosted-open melt rate λᵒ']]
+        : [['lambda', 'Frontier price melt rate λ']];
     const KEYS = [
-      ['lambda', 'API price melt rate λ'],
+      ...priceKeys,
       ['e0', 'Electricity price e₀'],
       ['gamma', 'Electricity escalation γ'],
+      ['sigma', 'Movable workload share σ'],
       ['u', 'Utilization u'],
       ['s0', 'GPU throughput s₀'],
       ['kappa', 'Quality gap κ'],
@@ -639,13 +873,18 @@ const GLACIER = (() => {
       ['mYr', 'MLOps cost m'],
     ];
     return KEYS.map(([key, label]) => {
-      const up = simulate({ ...P, [key]: P[key] * 1.3 }).npvAdvantage - base.npvAdvantage;
-      const dn = simulate({ ...P, [key]: P[key] * 0.7 }).npvAdvantage - base.npvAdvantage;
+      const bounded = key === 'providerOutputShare' || key === 'providerCacheHit' || key === 'sigma';
+      const upValue = bounded ? clamp01(P[key] * 1.3) : P[key] * 1.3;
+      const dnValue = bounded ? clamp01(P[key] * 0.7) : P[key] * 0.7;
+      const up = simulate({ ...P, [key]: upValue }).npvAdvantage - base.npvAdvantage;
+      const dn = simulate({ ...P, [key]: dnValue }).npvAdvantage - base.npvAdvantage;
       return { key, label, up, dn };
     });
   }
 
-  return { DEFAULTS, simulate, epsilon0, meltTime, glacierValue,
+  return { DEFAULTS, PROVIDER_RATE_CARD, PROVIDER_RATE_CARD_AS_OF,
+           providerBasket, providerPriceAt, comparatorMeltRate,
+           simulate, epsilon0, meltTime, glacierValue,
            minViableScale, maxDevCost, elecShare, tornado,
            SECONDS_PER_YEAR, HOURS_PER_YEAR };
 })();
@@ -664,11 +903,23 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     scaleup:    { Q0m: 5000,  g: 0.40, D: 250000, mYr: 450000 },
     enterprise: { Q0m: 50000, g: 0.25, D: 400000, mYr: 900000 },
   };
+  const COMPARATOR_NAMES = {
+    frontier: 'the frontier API',
+    hostedOpen: 'commodity hosted open weights',
+    inferenceCloud: 'the managed-inference basket',
+  };
+  const COMPARATOR_SHORT = {
+    frontier: 'Frontier API',
+    hostedOpen: 'Hosted open',
+    inferenceCloud: 'Inference clouds',
+  };
 
   // [inputId, stateKey, scale] — UI percent fields scale by 0.01
   const BIND = [
     ['in-Q0m','Q0m',1], ['in-sigma','sigma',0.01], ['in-g','g',0.01], ['in-p0','p0',1], ['in-lambda','lambda',1],
     ['in-pOpen0','pOpen0',1], ['in-lambdaOpen','lambdaOpen',1], ['in-kappa','kappa',1],
+    ['in-providerOutputShare','providerOutputShare',0.01], ['in-providerCacheHit','providerCacheHit',0.01],
+    ['in-providerDiscount','providerDiscount',0.01], ['in-lambdaProvider','lambdaProvider',1],
     ['in-h','h',1], ['in-s0','s0',1], ['in-u','u',0.01], ['in-mu','mu',0.01],
     ['in-N','N',1], ['in-delta','delta',0.01], ['in-e0','e0',1], ['in-gamma','gamma',0.01],
     ['in-wKw','wKw',1], ['in-pue','pue',1], ['in-D','D',1], ['in-mYr','mYr',1],
@@ -689,7 +940,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
 
   const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const COLORS = () => ({
-    build: cssVar('--s-build'), frontier: cssVar('--s-frontier'), open: cssVar('--s-open'),
+    build: cssVar('--s-build'), frontier: cssVar('--s-frontier'), open: cssVar('--s-open'), provider: cssVar('--s-provider'),
     ink: cssVar('--ink'), ink2: cssVar('--ink-2'), muted: cssVar('--muted'),
     grid: cssVar('--grid'), baseline: cssVar('--baseline'), surface: cssVar('--surface'),
     good: cssVar('--st-good'), goodText: cssVar('--st-good-text'),
@@ -716,14 +967,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
   }
 
   // ---------- generic line chart ----------
-  // series: [{key,name,color,values,width,opacity}] ; band: {upper,lower,color} clipped to upper>lower
+  // series: [{key,name,color,values,width,opacity}]
+  // bands: [{upper,lower,color,name,opacity}] clipped to upper>lower.
+  // cfg.band remains a backwards-compatible shorthand for one band.
   function lineChart(boxId, legendId, cfg) {
     const box = document.getElementById(boxId);
     const C = COLORS();
     const M = cfg.months;
     const W = 760, H = 320, mg = { l: 58, r: 20, t: 16, b: 34 };
     const iw = W - mg.l - mg.r, ih = H - mg.t - mg.b;
-    const all = cfg.series.flatMap(s => s.values).filter(v => isFinite(v));
+    const bands = cfg.bands || (cfg.band ? [cfg.band] : []);
+    const all = [
+      ...cfg.series.flatMap(s => s.values),
+      ...bands.flatMap(b => [...b.upper, ...b.lower]),
+    ].filter(v => isFinite(v));
     let lo = cfg.log ? Math.min(...all.filter(v => v > 0)) : Math.min(0, ...all);
     let hi = Math.max(...all);
     if (cfg.log) { lo = Math.pow(10, Math.floor(Math.log10(lo))); hi = Math.pow(10, Math.ceil(Math.log10(hi))); }
@@ -750,9 +1007,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     g += `<text x="${W - mg.r}" y="${H - 12}" text-anchor="end" font-size="10.5" fill="${C.muted}">month</text>`;
     g += `<text x="${mg.l}" y="${mg.t - 4}" font-size="11" fill="${C.ink2}">${cfg.yLabel}</text>`;
 
-    // band (glacier wedge)
-    if (cfg.band) {
-      const { upper, lower, color } = cfg.band;
+    // bands (provider quote interval and/or selected-comparator glacier)
+    for (const band of bands) {
+      const { upper, lower, color } = band;
       let up = '', down = '', started = false, parts = [];
       for (let i = 0; i < M; i++) {
         if (upper[i] > lower[i] && isFinite(upper[i]) && isFinite(lower[i]) && (!cfg.log || lower[i] > 0)) {
@@ -762,7 +1019,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
         } else started = false;
       }
       for (const p of parts) {
-        g += `<polygon points="${p.up.join(' ')} ${p.dn.join(' ')}" fill="${color}" opacity="0.13"/>`;
+        g += `<polygon points="${p.up.join(' ')} ${p.dn.join(' ')}" fill="${color}" opacity="${band.opacity == null ? 0.13 : band.opacity}"/>`;
       }
     }
     // series lines + end dots
@@ -791,7 +1048,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
       const lg = document.getElementById(legendId);
       lg.textContent = '';
       const items = [...cfg.series];
-      if (cfg.band) items.push({ name: cfg.band.name, color: cfg.band.color, isFill: true });
+      for (const band of bands) items.push({ name: band.name, color: band.color, isFill: true });
       for (const s of items) {
         const k = document.createElement('span'); k.className = 'key';
         const sw = document.createElement('span');
@@ -908,9 +1165,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
   function render() {
     const C = COLORS();
     const P = { ...state };
-    const sim = GLACIER.simulate(P);
-    const altComp = P.comparator === 'frontier' ? 'hostedOpen' : 'frontier';
-    const simAlt = GLACIER.simulate({ ...P, comparator: altComp });
+    const comparatorIds = Object.keys(COMPARATOR_NAMES);
+    const sims = Object.fromEntries(comparatorIds.map(id => [id, GLACIER.simulate({ ...P, comparator: id })]));
+    const sim = sims[P.comparator];
     const melt = GLACIER.meltTime(P);
     const eps0 = GLACIER.epsilon0(P);
     const G = GLACIER.glacierValue(P, sim);
@@ -918,28 +1175,31 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     const dMax = GLACIER.maxDevCost(P, sim);
     const eShare = GLACIER.elecShare(P, sim);
     const M = sim.M, rows = sim.rows;
-    const compName = P.comparator === 'frontier' ? 'the frontier API' : 'hosted open-weights';
+    const compName = COMPARATOR_NAMES[P.comparator];
+    const buyColor = P.comparator === 'frontier' ? C.frontier : P.comparator === 'hostedOpen' ? C.open : C.provider;
 
     // ----- verdict -----
     const vCard = $('#verdict'), pill = $('#verdict-pill'), word = $('#verdict-word');
     const buildWins = sim.npvAdvantage >= 0;
-    const hostedSim = P.comparator === 'hostedOpen' ? sim : simAlt;
-    const hostedBeatsBuild = hostedSim.npvAdvantage < 0;
+    const cheaperAlternatives = comparatorIds
+      .filter(id => id !== P.comparator && sims[id].npvAdvantage < 0)
+      .sort((a, b) => sims[a].npvAdvantage - sims[b].npvAdvantage);
+    const cheapestAlternative = cheaperAlternatives[0];
     let cls, pw, text, note = '';
     const yrs = P.Tyears === 1 ? '1 year' : P.Tyears + ' years';
-    if (buildWins && (!hostedBeatsBuild || P.comparator === 'hostedOpen')) {
+    if (buildWins && !cheapestAlternative) {
       cls = ''; pw = 'BUILD'; 
       text = `Self-hosting beats ${compName} by ${fmtUSD(sim.npvAdvantage)} over ${yrs}` +
         (sim.breakEvenMonth !== null ? ` — break-even in month ${sim.breakEvenMonth}.` : '.');
-    } else if (buildWins && hostedBeatsBuild) {
+    } else if (buildWins && cheapestAlternative) {
       cls = 'mixed'; pw = 'IT DEPENDS';
-      text = `Building beats ${compName} by ${fmtUSD(sim.npvAdvantage)} — but renting the same open model (hosted open-weights) is ${fmtUSD(-simAlt.npvAdvantage)} cheaper than building it yourself.`;
+      text = `Building beats ${compName} by ${fmtUSD(sim.npvAdvantage)} — but ${COMPARATOR_NAMES[cheapestAlternative]} is ${fmtUSD(-sims[cheapestAlternative].npvAdvantage)} cheaper than building it yourself.`;
       note = 'Building only wins outright if APIs are off the table (data residency, compliance, latency) or your utilization and throughput reach provider grade.';
     } else {
       cls = 'bad'; pw = 'BUY';
       text = `Keep buying: building costs ${fmtUSD(-sim.npvAdvantage)} more than ${compName} over ${yrs}.`;
       if (minScale !== Infinity && minScale > P.Q0m) {
-        note = `At these assumptions, building starts to pay at roughly ${fmtTok(minScale)} tokens/month (you are at ${fmtTok(P.Q0m)}).`;
+        note = `The first viable fleet band appears near ${fmtTok(minScale)} tokens/month (you are at ${fmtTok(P.Q0m)}). Integer GPU steps can create dips just above it, so test your exact load.`;
       } else if (minScale === Infinity) {
         note = 'No scale rescues it under these assumptions — the melt rate and your cost floor decide this, not volume.';
       }
@@ -984,7 +1244,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
       kpi('Break-even', sim.breakEvenMonth !== null ? 'month ' + sim.breakEvenMonth : 'never', sim.breakEvenMonth !== null ? 'good' : 'bad', 'within the ' + yrs + ' horizon'),
       kpi('Glacier melt time t*', meltStr, '', 'margin over electricity floor'),
       kpi('Harvestable glacier', fmtUSD(G), '', 'discounted margin vs toll ' + fmtUSD(P.D + sim.capexPV + sim.mlopsPV - sim.salvagePV)),
-      kpi('Min viable scale', minScale === Infinity ? 'none' : fmtTok(minScale) + '/mo', '', 'volume where building starts to pay'),
+      kpi('First viable scale', minScale === Infinity ? 'none' : fmtTok(minScale) + '/mo', '', 'first crossing; GPU steps make NPV a sawtooth'),
       kpi('Electricity floor ε₀', fmtPrice(eps0 * P.kappa) + '/M', '', eShare >= 0 ? (eShare * 100).toFixed(1) + '% of build cost is power' : ''),
     ]);
 
@@ -992,11 +1252,15 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     const months = rows.map(r => r.i);
     const frontier = rows.map(r => r.pF);
     const hostedRef = rows.map(r => r.pO * P.kappa);
+    const providerRef = rows.map(r => r.pProvider * P.kappa);
+    const providerLowRef = rows.map(r => r.pProviderLow * P.kappa);
+    const providerHighRef = rows.map(r => r.pProviderHigh * P.kappa);
     const buildAllIn = rows.map(r => r.buildAllIn);
     const elecFloor = rows.map(r => P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t));
     const compSeries = rows.map(r => r.comp);
     const series = [
       { key: 'frontier', name: 'Frontier API', color: C.frontier, values: frontier },
+      { key: 'provider', name: 'Inference clouds (κ-adj)', color: C.provider, values: providerRef, width: 2.25 },
       { key: 'open', name: 'Hosted open (κ-adj)', color: C.open, values: hostedRef },
       { key: 'build', name: 'Build, all-in', color: C.build, values: buildAllIn, width: 2.5 },
     ];
@@ -1005,26 +1269,46 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     }
     lineChart('chart-glacier', 'legend-glacier', {
       months: M, series,
-      band: { upper: compSeries, lower: buildAllIn, color: C.build, name: 'the glacier (your margin)' },
+      bands: [
+        { upper: providerHighRef, lower: providerLowRef, color: C.provider, opacity: 0.10, name: 'provider quote range' },
+        { upper: compSeries, lower: buildAllIn, color: C.build, opacity: 0.13, name: 'the glacier (your margin)' },
+      ],
       fmtY: fmtPrice, yLabel: '$ per 1M reference tokens', log: logScale,
     });
     $('#eq-glacier').innerHTML =
-      'a(t) = c(t) − κ·ε(t)&emsp;&emsp;ε(t) = wφe₀e<sup>(γ−μ)t</sup>/(3600·s₀u)&emsp;&emsp;t* = ln(c₀/κε₀)/(λ+γ−μ) = ' +
+      'a(t) = c(t) − κ·ε(t)&emsp;&emsp;ε(t) = wφe₀e<sup>(γ−μ)t</sup>/(3600·s₀u)&emsp;&emsp;t* = ln(c₀/κε₀)/(λ<sub>c</sub>+γ−μ) = ' +
       (melt.mode === 'never' ? '∞' : melt.tStar.toFixed(2) + ' yr') +
       '&emsp;&emsp;ε₀ = ' + fmtPrice(eps0) + '/M open tok';
-    fillTable('t-glacier', ['month', 'frontier $/M', 'hosted-open $/M (κ-adj)', 'build all-in $/M', 'electricity $/M', 'glacier margin $/M'],
+    fillTable('t-glacier', ['month', 'frontier $/M', 'inference-cloud $/M (κ-adj)', 'provider range', 'hosted-open $/M (κ-adj)', 'build all-in $/M', 'electricity $/M', 'glacier margin $/M'],
       rows.filter((_, i) => i % 3 === 0).map(r => [
-        String(r.i), fmtPrice(r.pF), fmtPrice(r.pO * P.kappa), fmtPrice(r.buildAllIn),
+        String(r.i), fmtPrice(r.pF), fmtPrice(r.pProvider * P.kappa),
+        fmtPrice(r.pProviderLow * P.kappa) + '–' + fmtPrice(r.pProviderHigh * P.kappa),
+        fmtPrice(r.pO * P.kappa), fmtPrice(r.buildAllIn),
         fmtPrice(P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t)),
         fmtPrice(Math.max(0, r.comp - P.kappa * eps0 * Math.exp((P.gamma - P.mu) * r.t))),
       ]));
+
+    // ----- managed inference rate-card basket -----
+    const pb = sim.provider;
+    fillTable('t-provider', ['provider', 'input $/M', 'cached input', 'output $/M', 'effective input', 'workload blend', 'weight'],
+      [
+        ...pb.providers.map(row => [
+          row.name, fmtPrice(row.input), fmtPrice(row.cachedInput), fmtPrice(row.output),
+          fmtPrice(row.effectiveInput), fmtPrice(row.blended), (row.weight * 100).toFixed(1) + '%',
+        ]),
+        ['Equal-weight basket', '—', '—', '—', '—', fmtPrice(pb.blended), '100%'],
+      ]);
+    $('#eq-provider').innerHTML =
+      'b<sub>j</sub> = (1−d)[(1−θ)((1−χ)I<sub>j</sub>+χC<sub>j</sub>)+θO<sub>j</sub>]&emsp;&emsp;' +
+      'p<sub>P,0</sub> = Σω<sub>j</sub>b<sub>j</sub> = ' + fmtPrice(pb.blended) + '/M open tok&emsp;&emsp;' +
+      'c<sub>P</sub>(t) = κp<sub>P,0</sub>e<sup>−λᵖt</sup> = ' + fmtPrice(P.kappa * pb.blended) + '/M ref tok at t=0';
 
     // ----- race chart -----
     const beM = sim.breakEvenMonth;
     lineChart('chart-race', 'legend-race', {
       months: M,
       series: [
-        { key: 'buy', name: 'Keep buying (cum.)', color: C.frontier, values: rows.map(r => r.cumBuy) },
+        { key: 'buy', name: COMPARATOR_SHORT[P.comparator] + ' (cum.)', color: buyColor, values: rows.map(r => r.cumBuy) },
         { key: 'build', name: 'Build (cum., incl. toll)', color: C.build, values: rows.map(r => r.cumBuild), width: 2.5 },
       ],
       markers: beM !== null ? [{ i: beM, v: rows[beM].cumBuy, label: 'break-even · m' + beM }] : [],
@@ -1043,14 +1327,15 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     lineChart('chart-yield', 'legend-yield', {
       months: M,
       series: [
-        { key: 'ybuy', name: 'Token yield · buying', color: C.frontier, values: rows.map(r => r.yieldBuy) },
+        { key: 'ybuy', name: 'Token yield · ' + COMPARATOR_SHORT[P.comparator], color: buyColor, values: rows.map(r => r.yieldBuy) },
         { key: 'ybuild', name: 'Token yield · building', color: C.build, values: rows.map(r => r.yieldBuild), width: 2.5 },
       ],
       fmtY: fmtX, yLabel: 'value multiple per $ of token spend', log: false,
     });
     const sigmaE = eShare;
+    const buyMeltRate = GLACIER.comparatorMeltRate(P);
     $('#eq-yield').innerHTML =
-      'y = v/cost&emsp;&emsp;d ln y<sub>buy</sub>/dt = +λ = +' + (P.lambda * 100).toFixed(0) + '%/yr' +
+      'y = v/cost&emsp;&emsp;d ln y<sub>buy</sub>/dt = +λ<sub>c</sub> = +' + (buyMeltRate * 100).toFixed(0) + '%/yr' +
       '&emsp;&emsp;d ln y<sub>build</sub>/dt ≈ μ·σ<sub>var</sub> − γ·σ<sub>E</sub>&emsp;(σ<sub>E</sub> = ' + (sigmaE * 100).toFixed(1) + '% → electricity drag ≈ −' + (P.gamma * sigmaE * 100).toFixed(2) + '%/yr)';
     fillTable('t-yield', ['month', 'buy $/M', 'build all-in $/M', 'yield buying', 'yield building'],
       rows.filter((_, i) => i % 3 === 0).map(r => [
@@ -1085,6 +1370,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     const half = parseFloat(ev.target.value);
     state.lambda = half >= 99 ? 0 : Math.log(2) / half;
     state.lambdaOpen = state.lambda;
+    state.lambdaProvider = state.lambda;
     syncInputsFromState(); render();
   });
 

@@ -8,7 +8,7 @@
 \title{The Glacier Model:\\ \large Power chips, token prices, dev cost, and the melting margin\\
 of self-hosted open-weight inference}
 \author{Manny Villegas}
-\date{August 2026 \\ \small Working paper --- companion to \emph{Two Gates and a Half-Life},
+\date{September 2026 \\ \small Working paper --- companion to \emph{Two Gates and a Half-Life},
 \emph{Deflating Token Yield},\\ \small and \emph{From Delivered Power to Token Price}}
 \begin{document}
 \maketitle
@@ -24,7 +24,9 @@ condition from participation, and the force-vector decomposition of Token Yield 
 rising electricity prices. Calibrated to August-2026 estimates, the participation gate
 binds near $1.5$--$2\times 10^{10}$ movable tokens per month against frontier APIs, and is
 essentially never cleared against hosted open-weight serving absent provider-grade
-utilization or data-residency constraints. Every numerical claim is reproduced by
+utilization or data-residency constraints. We add a same-model managed-inference basket
+for Fireworks AI, Baseten, and DeepInfra that resolves input, cached-input, and output
+billing rather than assuming one sticker price. Every numerical claim is reproduced by
 \texttt{dashboard/verify.mjs} in the accompanying repository.
 \end{abstract}
 
@@ -35,6 +37,14 @@ per year. The frontier API charges $p(t)=p_0 e^{-\lambda t}$ per token
 ($\lambda=\ln 2/t_{1/2}$); hosted open-weight serving charges $p_o(t)=p_{o0}e^{-\lambda_o t}$
 per \emph{open} token. Quality parity requires $\kappa\ge 1$ open tokens per reference
 token, so the comparator price per reference token is $c(t)=p(t)$ or $\kappa p_o(t)$.
+Managed inference provider $j$ publishes uncached-input, cached-input, and output rates
+$(I_j,C_j,O_j)$. With output share $\theta$, cached share $\chi$ of input, public-rate
+discount $d$, and routing weights $\omega_j$ summing to one,
+\begin{align}
+b_j&=(1-d)\left[(1-\theta)((1-\chi)I_j+\chi C_j)+\theta O_j\right],\\
+p_{P0}&=\sum_j\omega_jb_j, & p_P(t)&=p_{P0}e^{-\lambda_Pt}, & c_P(t)&=\kappa p_P(t).
+\label{eq:provider}
+\end{align}
 
 A GPU slot costs $h$ all-in, draws $w$ kW at PUE $\varphi$ \emph{whenever powered}, and
 serves $s(t)=s_0e^{\mu t}$ tokens/s at utilization $u\in(0,1]$. Electricity costs
@@ -50,7 +60,7 @@ $3600\,s(t)\,u$ tokens:
 \label{eq:eps}
 \end{equation}
 Idle power is paid, which is why $u$ sits in the denominator. At central calibration
-$\varepsilon_0=\$0.172$ per million open tokens.
+$\varepsilon_0=\$0.103$ per million open tokens.
 
 \section{The two paths}
 \paragraph{Buy.} $\mathrm{PV}_{\mathrm{buy}}
@@ -61,6 +71,27 @@ $\lambda_c+r-g\to0$ giving $c_0Q_0^\sigma T$; convergence as $T\to\infty$ iff
 $\lambda_c+r>g$. The implementation uses the exact monthly geometric sum
 $c_0 Q_0^{\sigma,\mathrm{mo}}(1-\rho^{M})/(1-\rho)$, $\rho=e^{(g-\lambda_c-r)/12}$,
 $M=12T$ (month-start convention).
+
+\paragraph{Managed-inference basket.} The 2026-09-01 public standard-tier snapshot holds
+DeepSeek V4 Pro 0813 fixed across providers:
+\begin{center}\small
+\begin{tabular}{lrrrr}
+\toprule
+Provider & $I_j$ & $C_j$ & $O_j$ & $b_j$ at $\theta=\chi=.25$\\
+\midrule
+Fireworks AI & 1.32 & 0.044 & 3.96 & 1.74075\\
+Baseten & 1.32 & 0.132 & 3.96 & 1.75725\\
+DeepInfra & 1.30 & 0.10 & 2.60 & 1.40000\\
+\midrule
+Equal-weight basket & & & & \textbf{1.63267}\\
+\bottomrule
+\end{tabular}
+\end{center}
+Prices are dollars per million open tokens. The public-quote range is
+$\$1.40000$--$\$1.75725$/M; after $\kappa=1.15$, the center is $\$1.87757$/M reference
+tokens. The zero-cache control is $\$1.86167$/M open tokens, so a 25\% input-cache hit
+reduces the blend 12.3\%. Cache and contract discount are scenario inputs, not estimated
+population means.
 
 \paragraph{Build.} Fleet tranches $N_i=\max\!\big(N_{i-1},\lceil \kappa q_i/\mathrm{cap}_i\rceil\big)$
 purchased when demand arrives; capacity per GPU-month $\mathrm{cap}_i = s(t_i)u\,Y/12$;
@@ -73,6 +104,18 @@ overflow above capacity is bought at $c(t)$. Then
 with $\bar h=8766$ h/yr. $\mathrm{NPV_{adv}}=\mathrm{PV_{buy}}-\mathrm{PV_{build}}$;
 build iff $\mathrm{NPV_{adv}}\ge0$. $D$ enters additively, so the maximum justifiable dev
 cost is $D_{\max}=D+\mathrm{NPV_{adv}}$.
+
+For the first viable scale, write $B$ for discounted BUY dollars per unit of $Q_0$,
+$K_{\mathrm{frac}}$ for discounted variable BUILD cost per unit under a divisible fleet,
+and $F=D+\mathrm{PV}(m)$. Nonnegative capex, depreciation, and power imply
+\begin{equation}
+\mathrm{NPV}_{\mathrm{integer}}(Q_0)\le
+\mathrm{NPV}_{\mathrm{frac}}(Q_0)=Q_0(B-K_{\mathrm{frac}})-F.
+\end{equation}
+Thus $B-K_{\mathrm{frac}}\le0$ proves no viable scale; otherwise no integer crossing can
+occur below $F/(B-K_{\mathrm{frac}})$. From that safe lower bound the engine walks each
+integer-fleet breakpoint, because GPU purchases make NPV a sawtooth rather than a monotone
+step function.
 
 \section{The glacier equations}
 The per-reference-token margin on a variable-cost basis is
@@ -130,13 +173,15 @@ companion calibration gives $\partial\ln Y/\partial\ln e=-s_e\approx-0.085$ agai
 $\partial\ln Y/\partial\ln E_{\mathrm{delivered}}=+1/\epsilon$, a $4$--$24\times$ stronger
 channel. Watch the megawatts, not the \$/kWh.
 
-\section{Calibration (August 2026, knowledge-based)}
+\section{Calibration (August/September 2026)}
 $h=\$45$k/slot, $w=1.3$ kW, $\varphi=1.3$, $s_0=1000$ tok/s, $u=0.5$, $\mu=0.25$,
 $e_0=\$0.11$/kWh, $\gamma=0.06$, $p_0=\$4.25$/Mtok (workhorse tier), $\lambda=0.462$
 (18-month halving, list-price regime), $p_{o0}=\$0.30$/Mtok (commodity hosted-open),
 $\kappa=1.15$, $D=\$250$k, $m=\$450$k/yr, $\delta=0.30$, $r=0.12$,
 $T=3$ yr. Then $\varepsilon_0=\$0.103$/M open tokens; against the frontier,
-$t^\ast=13.2$ yr; against hosted open-weights, $t^\ast=3.9$ yr. Per-bound sourcing:
+$t^\ast=13.2$ yr; against hosted open-weights, $t^\ast=3.9$ yr; against the managed
+provider basket, $t^\ast=10.1$ yr. Infrastructure bounds are August knowledge-based
+estimates; provider rates are a primary-source 2026-09-01 snapshot. Per-bound sourcing:
 \texttt{docs/calibration-data.md}.
 
 \begin{table}[h]\centering\small
@@ -154,17 +199,27 @@ Break-even & never & never & month 33 & never\\
 \bottomrule
 \end{tabular}
 \caption{Engine output at central calibration ($g=40\%$, $D=\$250$k, $m=\$450$k for the
-scaleup; $g=25\%$, $D=\$400$k, $m=\$900$k for the enterprise). Minimum viable scale vs the
+scaleup; $g=25\%$, $D=\$400$k, $m=\$900$k for the enterprise). First viable scale vs the
 frontier is $\approx18$B movable tokens/month (scaleup settings) to $\approx41$B
-(enterprise settings); vs hosted open-weights no scale suffices at central utilization.}
+(enterprise settings); vs hosted open-weights no scale suffices at central utilization.
+Integer GPU purchases make NPV a sawtooth, so loads above the first crossing must be checked
+at their exact fleet size.}
 \end{table}
+
+For the managed-inference basket, the same scaleup has $G=\$238$k against the $\$1.58$M
+toll and $\mathrm{NPV_{adv}}=-\$1.35$M; first viable scale is approximately 120B
+tokens/month. The enterprise has $G=\$1.97$M against the $\$4.10$M toll and
+$\mathrm{NPV_{adv}}=-\$2.12$M. The provider curve therefore lands between the frontier
+and commodity-hosted screens, as it should.
 
 \section{Limitations}
 Deterministic paths (no option value of waiting); scalar $\kappa$ for a substitutability
 curve; exogenous $\lambda$ despite the defensive-pricing feedback; integer-GPU thresholds;
 no latency, data-gravity, or compliance terms --- these last are reasons to build at
 negative $\mathrm{NPV_{adv}}$ and belong as qualitative overrides. Calibration is
-order-of-magnitude, knowledge-based as of August 2026.
+order-of-magnitude, knowledge-based as of August 2026. Provider public rates are a dated
+same-model snapshot and exclude batch, priority/flex/US-only tiers, egress, commitments,
+private discounts, and latency or reliability differences.
 
 \vspace{1em}\noindent\emph{Analytical work, not investment advice. Reproduction:
 \texttt{node dashboard/verify.mjs}; interactive:
