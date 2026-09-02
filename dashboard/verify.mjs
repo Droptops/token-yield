@@ -11,6 +11,12 @@ new Function('module', 'exports', m[1])(mod, mod.exports);
 const G = mod.exports;
 
 let fails = 0;
+const devEngine = readFileSync(new URL('./engine.dev.js', import.meta.url), 'utf8').trim();
+const embeddedEngine = m[1].trim();
+const engineParity = devEngine === embeddedEngine;
+console.log(`${engineParity ? 'PASS' : 'FAIL'}  embedded engine matches dashboard/engine.dev.js`);
+if (!engineParity) fails++;
+
 const check = (name, got, want, tol) => {
   const ok = Math.abs(got - want) <= tol * Math.max(1, Math.abs(want));
   if (!ok) fails++;
@@ -136,6 +142,128 @@ const check = (name, got, want, tol) => {
   check('H-C npvBuild', C.npvBuild, 391071.433, 1e-8);
   check('H-C tStar', G.meltTime(CP).tStar, 2.12668, 1e-5);
   check('H-C overflow ref tok/mo', C.rows[0].overflowRef * 1e6, 4.48080e8, 1e-5);
+}
+
+// ---- Vector I: same-model inference-provider basket arithmetic
+{
+  const P = { ...G.DEFAULTS };
+  const b = G.providerBasket(P);
+  const byKey = Object.fromEntries(b.providers.map(row => [row.key, row]));
+  // theta=.25 output, chi=.25 cached input, d=0.
+  check('I Fireworks blended quote', byKey.fireworks.blended, 1.74075, 1e-12);
+  check('I Baseten blended quote', byKey.baseten.blended, 1.75725, 1e-12);
+  check('I DeepInfra blended quote', byKey.deepinfra.blended, 1.4, 1e-12);
+  check('I equal-weight provider basket', b.blended, 1.6326666666666667, 1e-12);
+  check('I provider low', b.low, 1.4, 1e-12);
+  check('I provider high', b.high, 1.75725, 1e-12);
+  check('I provider curve at year 2', G.providerPriceAt(P, 2), b.blended * Math.exp(-2 * P.lambdaProvider), 1e-12);
+
+  const uncached = G.providerBasket({ ...P, providerCacheHit: 0 });
+  const cached = G.providerBasket({ ...P, providerCacheHit: 0.5 });
+  console.log(`${cached.blended < uncached.blended ? 'PASS' : 'FAIL'}  I cache hits lower provider price`);
+  if (!(cached.blended < uncached.blended)) fails++;
+  const discounted = G.providerBasket({ ...P, providerDiscount: 0.2 });
+  check('I contract discount is linear', discounted.blended, 0.8 * b.blended, 1e-12);
+}
+
+// ---- Vector J: provider comparator matches the geometric BUY closed form
+// and the same analytic melt clock used by the other exponential comparators.
+{
+  const P = { ...G.DEFAULTS, Tyears: 2, r: 0.10, g: 0.20, lambdaProvider: 0.40,
+              comparator: 'inferenceCloud', fleetMode: 'upfront' };
+  const s = G.simulate(P);
+  const M = 24;
+  const rho = Math.exp((P.g - P.lambdaProvider - P.r) / 12);
+  const geo = (1 - Math.pow(rho, M)) / (1 - rho);
+  const c0 = P.kappa * G.providerBasket(P).blended;
+  check('J provider npvBuy', s.npvBuy, c0 * P.Q0m * P.sigma * geo, 1e-12);
+  const eps0 = G.epsilon0(P);
+  const tWant = Math.log(c0 / (P.kappa * eps0)) / (P.lambdaProvider + P.gamma - P.mu);
+  check('J provider melt time', G.meltTime(P).tStar, tWant, 1e-12);
+  check('J provider row basis', s.rows[0].comp, P.kappa * s.rows[0].pProvider, 1e-12);
+}
+
+// ---- Vector K: first viable scale must respect the integer-fleet sawtooth.
+// A global bisection used to return ~18049.3M; the true first crossing is a
+// narrow feasible interval near 18032.95M followed immediately by another GPU jump.
+{
+  const P = { ...G.DEFAULTS, comparator: 'frontier' };
+  const q = G.minViableScale(P);
+  check('K first viable scale', q, 18032.947381127375, 1e-10);
+  const before = G.simulate({ ...P, Q0m: q - 0.01 }).npvAdvantage;
+  const inside = G.simulate({ ...P, Q0m: q + 0.01 }).npvAdvantage;
+  const afterJump = G.simulate({ ...P, Q0m: q + 1 }).npvAdvantage;
+  console.log(`${before < 0 ? 'PASS' : 'FAIL'}  K scale just below first crossing is infeasible`);
+  if (!(before < 0)) fails++;
+  console.log(`${inside > 0 ? 'PASS' : 'FAIL'}  K first fixed-fleet band becomes feasible`);
+  if (!(inside > 0)) fails++;
+  console.log(`${afterJump < 0 ? 'PASS' : 'FAIL'}  K next GPU jump exposes sawtooth dip`);
+  if (!(afterJump < 0)) fails++;
+  const hosted = G.minViableScale({ ...G.DEFAULTS, comparator: 'hostedOpen' });
+  console.log(`${hosted === Infinity ? 'PASS' : 'FAIL'}  K fractional-fleet bound proves hosted-open has no viable scale`);
+  if (hosted !== Infinity) fails++;
+}
+
+// ---- Vector L: overflow cannot earn glacier margin, and a zero-price
+// comparator cannot "open later" merely because both exponentials decay.
+{
+  const P = { ...G.DEFAULTS, comparator: 'inferenceCloud', fleetMode: 'manual', N: 1,
+              Q0m: 10000, Tyears: 1 };
+  const s = G.simulate(P);
+  const eps0 = G.epsilon0(P);
+  let capped = 0, uncapped = 0;
+  for (const row of s.rows) {
+    const eps = eps0 * Math.exp((P.gamma - P.mu) * row.t);
+    const margin = row.comp - P.kappa * eps;
+    if (margin <= 0) continue;
+    const disc = Math.exp(-P.r * row.t);
+    capped += disc * margin * Math.min(row.q, row.selfServed / P.kappa);
+    uncapped += disc * margin * row.q;
+  }
+  check('L overflow-capped glacier', G.glacierValue(P, s), capped, 1e-12);
+  console.log(`${capped < uncapped ? 'PASS' : 'FAIL'}  L overflow earns no glacier margin`);
+  if (!(capped < uncapped)) fails++;
+  const free = { ...P, providerDiscount: 1, mu: 1, gamma: 0 };
+  const melt = G.meltTime(free);
+  console.log(`${melt.mode === 'alreadyMelted' && melt.tStar === 0 ? 'PASS' : 'FAIL'}  L zero-price comparator stays already melted`);
+  if (!(melt.mode === 'alreadyMelted' && melt.tStar === 0)) fails++;
+}
+
+// ---- Vector M: a negative arbitrary upper bound cannot prove there is no
+// viable scale. Here 100T ref tok/mo lands just after a two-GPU jump and loses,
+// while the nearly-full one-GPU band below it is profitable.
+{
+  const capM = 60000000;
+  const P = {
+    ...G.DEFAULTS,
+    Tyears: 1 / 12,
+    r: 0,
+    g: 0,
+    p0: 0.018,
+    lambda: 0,
+    comparator: 'frontier',
+    fleetMode: 'upfront',
+    kappa: 1,
+    sigma: 1,
+    h: 1000000,
+    s0: capM * 1e6 / (G.SECONDS_PER_YEAR / 12),
+    mu: 0,
+    u: 1,
+    wKw: 0,
+    pue: 1,
+    e0: 0,
+    gamma: 0,
+    D: 0,
+    mYr: 0,
+    delta: 1000,
+  };
+  const upperAdv = G.simulate({ ...P, Q0m: 1e8 }).npvAdvantage;
+  console.log(`${upperAdv < 0 ? 'PASS' : 'FAIL'}  M arbitrary upper bound is infeasible`);
+  if (!(upperAdv < 0)) fails++;
+  const q = G.minViableScale(P);
+  check('M earlier viable band is found', q, 1000000 / 0.018, 1e-10);
+  console.log(`${Number.isFinite(q) ? 'PASS' : 'FAIL'}  M negative upper bound does not mask an earlier crossing`);
+  if (!Number.isFinite(q)) fails++;
 }
 
 console.log(fails === 0 ? '\nALL CHECKS PASS' : `\n${fails} CHECKS FAILED`);

@@ -17,8 +17,8 @@ thick today, and yours to harvest if you show up with the right equipment.
 
 But this glacier is melting.
 
-- **The sun above it** is falling AI prices. Providers cut token prices roughly in half
-  every year. Every cut thins the glacier — the savings you were going to harvest next
+- **The sun above it** is falling AI prices. The central scenario halves comparable list
+  prices roughly every 18 months. Every cut thins the glacier — the savings you were going to harvest next
   year just got smaller.
 - **The warm ground below it** is your electricity bill. Power prices are drifting up a
   few percent a year, and every uptick raises the floor your costs sit on.
@@ -62,6 +62,14 @@ Suppose you're big enough to pass both gates against the fancy frontier models. 
 third character in the story: companies that **rent out the same open-source models you
 were about to buy machines for** — at prices that are already close to bare electricity
 cost, and falling just as fast.
+
+That market is not one price. The dashboard now adds a separate managed-inference curve
+using Fireworks AI, Baseten, and DeepInfra. It holds the model fixed (DeepSeek V4 Pro 0813),
+then blends each public bill from uncached input, cached input, and output tokens. At a 3:1
+input:output mix with 25% of input hitting cache, the same workload is `$1.40–$1.76` per
+million open tokens across the three public rate cards; the equal-weight center is `$1.63`.
+The purple band shows that spread. Cache hit rate and any real contract discount are inputs,
+because pretending every token or every customer gets one sticker price gives false precision.
 
 Beating the frontier API isn't the real bar. Beating the *rented open model* is, and in
 our numbers even a company with a $200k+/month token bill loses that comparison by
@@ -130,5 +138,5 @@ line you're on.
 | Gate 1 / Gate 2 | margin condition / participation condition |
 
 *Analytical work, not investment advice. Every number here comes from the model in this
-repository and its defaults are estimates as of August 2026 — the dashboard exists so you
-can disagree with them.*
+repository. Infrastructure defaults are estimates as of August 2026; the provider rate card
+is a September 1, 2026 snapshot. The dashboard exists so you can disagree with them.*

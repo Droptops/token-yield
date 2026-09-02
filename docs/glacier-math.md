@@ -43,8 +43,15 @@ fixed cost. Most mid-sized deployments live there.
 | `p(t) = p₀·e^(−λt)` | frontier API blended price | $/Mtok |
 | `λ = ln 2 / t_half` | frontier price melt rate | /yr |
 | `p_o(t) = p_o₀·e^(−λ_o t)` | hosted open-weight price (per *open* token) | $/Mtok |
+| `I_j, C_j, O_j` | provider `j` public prices: uncached input, cached input, output | $/Mtok |
+| `θ` | output share of all provider-billed tokens | – |
+| `χ` | cached share of provider input tokens | – |
+| `d` | negotiated discount to public provider rates | – |
+| `ω_j` | routing weight for provider `j`, `Σ_j ω_j = 1` | – |
+| `b_j` | workload-blended price at provider `j` | $/Mtok open |
+| `p_P(t) = p_P₀·e^(−λ_P t)` | managed-inference basket price, `p_P₀ = Σ_jω_jb_j` | $/Mtok open |
 | `κ ≥ 1` | quality multiplier: open tokens needed per reference token | – |
-| `c(t)` | comparator price per **reference** Mtok: `p(t)` or `κ·p_o(t)` | $/Mtok |
+| `c(t)` | comparator price per **reference** Mtok: `p(t)`, `κ·p_o(t)`, or `κ·p_P(t)` | $/Mtok |
 | `N` | GPUs owned | – |
 | `h` | all-in cost per GPU slot (card + server share + install) | $ |
 | `D` | one-time dev/integration cost | $ |
@@ -90,6 +97,12 @@ Constants: `Y = 31,557,600 s/yr` (365.25 d), `8,766 h/yr`, month = `Y/12 s = 730
 9. **λ is exogenous.** Defensive pricing (frontier cuts in response to migration) makes λ
    endogenous and *slows* the sector melt — see *Two Gates* §4. In this model a larger λ
    always shrinks your glacier: the incumbent's price cuts are a brake on your build case.
+10. **The managed-inference curve is a same-model public-rate snapshot, not a company
+    valuation model.** Fireworks AI, Baseten, and DeepInfra are compared on DeepSeek V4 Pro
+    0813 standard serverless rates as of 2026-09-01. Equal routing weights are the neutral
+    default; cache hit, output mix, contract discount, and future price melt are explicit
+    scenario inputs. Latency tiers, private deployments, batch discounts, and negotiated
+    commitments are excluded unless entered through `d`.
 
 ## 3. The BUY path
 
@@ -109,6 +122,39 @@ PV_buy^cont = c₀·σQ₀ᵧ · (1 − e^(−(λ_c+r−g)T)) / (λ_c + r − g)
 with the removable singularity `λ_c + r − g → 0` giving `c₀·σQ₀ᵧ·T`. For `T → ∞` this
 converges iff `λ_c + r > g`. Verified: `verify.mjs` vector B matches the geometric form to
 1e-12 relative.
+
+### 3.1 The managed-inference provider curve
+
+A single “hosted open” sticker price hides the largest billing asymmetries in real
+serverless inference. For provider `j`, let `θ` be output tokens divided by total billed
+tokens and `χ` the cache-hit fraction of input tokens. The workload-blended public quote is
+
+```
+b_j = (1−d)·[(1−θ)·((1−χ)I_j + χC_j) + θO_j]
+p_P₀ = Σ_j ω_j b_j,       Σ_j ω_j = 1
+p_P(t) = p_P₀·e^(−λ_P t)
+c_P(t) = κ·p_P(t)         $/reference Mtok
+```
+
+This order of operations matters: cache applies only to input, output has its own rate,
+the contract discount applies to the resulting bill, and `κ` converts the open-token bill
+to the reference-quality basis only after blending.
+
+The reproducible 2026-09-01 rate card uses the same DeepSeek V4 Pro 0813 model and standard
+tier at all three providers:
+
+| Provider | `I_j` | `C_j` | `O_j` | `b_j` at `θ=.25`, `χ=.25`, `d=0` |
+|---|---:|---:|---:|---:|
+| [Fireworks AI](https://docs.fireworks.ai/serverless/pricing) | 1.32 | 0.044 | 3.96 | **1.74075** |
+| [Baseten](https://www.baseten.co/pricing/) | 1.32 | 0.132 | 3.96 | **1.75725** |
+| [DeepInfra](https://deepinfra.com/deepseek-ai/DeepSeek-V4-Pro-0813) | 1.30 | 0.10 | 2.60 | **1.40000** |
+| Equal-weight basket | — | — | — | **1.63267** |
+
+Thus the dashboard's new managed-inference line starts at `$1.63267/M` open tokens, with a
+public-quote band of `$1.40000–$1.75725/M`; at `κ=1.15` that is `$1.87757/M` reference
+tokens. The zero-cache control is `$1.86167/M` open tokens, so the assumed 25% input cache
+hit lowers the basket by 12.3%. `χ` is not a market fact—replace it with workload telemetry.
+All four numbers are checked at machine precision in `verify.mjs` vector I.
 
 ## 4. The BUILD path
 
@@ -144,16 +190,35 @@ Break-even month: first `i` where cumulative discounted BUY ≥ cumulative disco
 ## 5. Break-even structure
 
 - **Max dev cost.** D enters additively: `D_max = D + NPV_adv`. (Vector E: exact.)
-- **Min viable scale.** `NPV_adv(Q₀)` is increasing and step-wise (integer GPUs); the
-  engine log-bisects to the threshold `Q₀_min`. At central defaults vs the frontier API:
+- **Min viable scale.** Within a fixed-GPU band, `NPV_adv(Q₀)` rises with volume, but each
+  additional GPU causes a downward jump: the feasible set is a sawtooth, not necessarily
+  one interval. A divisible-fleet relaxation first skips only the region that provably cannot
+  work; the engine then walks every integer fleet breakpoint and returns the **first** feasible
+  crossing. It does not use an invalid global bisection. At central defaults vs the frontier API:
   **≈ 18 B movable tokens/month**. Against hosted open-weights: **no scale suffices**
   (see §10 — the capex per token alone exceeds the hosted margin).
+
+  For the safe skip, let `B` be discounted BUY dollars per unit of `Q₀`, `K_frac` the
+  discounted variable BUILD cost per unit under perfectly divisible GPUs, and
+  `F = D + PV(m)`. Then
+
+  ```text
+  NPV_frac(Q₀) = Q₀(B−K_frac) − F,
+  NPV_integer(Q₀) ≤ NPV_frac(Q₀).
+  ```
+
+  The inequality follows because each rounded-up GPU adds nonnegative net capex, power,
+  and depreciation cost. If `B−K_frac≤0`, no integer fleet can work at any scale; otherwise
+  no crossing can occur below `F/(B−K_frac)`. The exact breakpoint walk starts there.
 - **Break-even horizon** `T_be` solves `NPV_adv(T) = 0`; generally a root-find. Special
   case `g = 0, γ = μ, λ_c = 0`: linear-in-T closed form
   `T_be = (D + H − V) / (12σQ₀(c₀ − κε₀) − m)` per discounted-rate adjustment.
 - **Signs of sensitivities** (all verified in the dashboard's tornado):
   `∂NPV_adv/∂λ < 0` (faster melt kills the build case), `∂/∂e₀ < 0`, `∂/∂γ < 0`,
   `∂/∂u > 0`, `∂/∂s₀ > 0`, `∂/∂κ < 0`, `∂/∂D = −1`, `∂/∂h < 0`, `∂/∂m < 0`.
+  On the provider path, `∂NPV_adv/∂χ < 0` and `∂NPV_adv/∂d < 0` because cache hits and
+  contract discounts make buying cheaper; `∂NPV_adv/∂θ > 0` for this rate card because
+  output tokens cost more than effective input tokens.
 
 ## 6. The glacier equations
 
@@ -174,10 +239,12 @@ t* = ln( c₀ / (κ·ε₀) ) / (λ_c + γ − μ)
 | melts | `c₀ > κε₀`, `λ_c+γ−μ > 0` | margin open now, gone at t* |
 | never melts | `c₀ > κε₀`, `λ_c+γ−μ ≤ 0` | margin grows — harvest forever |
 | already melted | `c₀ ≤ κε₀`, `λ_c+γ−μ ≥ 0` | buying is cheaper per token from day one |
-| opens later | `c₀ ≤ κε₀`, `λ_c+γ−μ < 0` | margin negative now, turns positive at t* < 0 formula's root |
+| opens later | `0 < c₀ ≤ κε₀`, `λ_c+γ−μ < 0` | margin negative now, turns positive at the formula's nonnegative root t* |
 
 Central defaults vs frontier: `t* = ln(4.25/0.119)/0.272 = 13.2 yr`. Vs hosted open-weights:
-`t* = ln(0.30/0.103)/0.272 = 3.92 yr`. (Vector C: closed form matches bisection to 1e-6.)
+`t* = ln(0.30/0.103)/0.272 = 3.92 yr`. Vs the managed-inference basket, `κ` cancels
+from the ratio and `t* = ln(1.63267/0.10328)/0.272 = 10.15 yr`. (Vectors C and J:
+closed forms match independent calculations to machine precision.)
 
 **Glacier value (the harvestable volume).** Over `τ = min(T, t*)`:
 
@@ -188,7 +255,9 @@ G = σQ₀ᵧ ∫₀^τ [ c₀·e^(−λ_c t) − κε₀·e^((γ−μ)t) ] · e
 
 each bracket collapsing to `·τ` at its removable singularity. The engine computes G as the
 month-sum over positive-margin months (identical convention to the cash flows; vector D:
-exact agreement), which also handles the sign cases without case analysis.
+exact agreement), capped to the reference-equivalent volume actually self-served; overflow
+is bought on both paths and contributes zero margin. This also handles the sign cases without
+case analysis.
 
 **The decision rule restated.** `BUILD ⟺ G ≥ toll`, where
 `toll = D + PV(capex) + PV(m) − PV(salvage)`. G excludes fixed costs by construction;
@@ -258,7 +327,9 @@ factors; month-start prices × month volume; discount `e^(−r t_i)`.
 q_i        = σQ₀·G^i            G = e^(g/12)          movable ref Mtok
 p_i        = p₀·L^i             L = e^(−λ/12)         $/ref Mtok
 pO_i       = p_o₀·Lo^i          Lo = e^(−λ_o/12)      $/open Mtok
-c_i        = frontier ? p_i : κ·pO_i                  $/ref Mtok
+b_j        = (1−d)[(1−θ)((1−χ)I_j+χC_j)+θO_j]         $/open Mtok
+pP_i       = (Σ_jω_jb_j)·Lp^i   Lp = e^(−λ_P/12)      $/open Mtok
+c_i        = p_i, κ·pO_i, or κ·pP_i                   $/ref Mtok
 e_i        = e₀·Γ^i             Γ = e^(γ/12)          $/kWh
 cap/GPU_i  = s₀·e^(μ t_i)·u·(Y/12)/10⁶                open Mtok
 N_i        = staged: max(N_{i−1}, ⌈κq_i/capGPU_i⌉)  · tranche capex N_i−N_{i−1} at h
@@ -271,15 +342,24 @@ salvage    = Σ_tranches n_k·h·e^(−δ(T−t_k)), credited at i = M−1, disc
 
 Outputs: `npvBuy`, `npvBuild`, `npvAdvantage`, `breakEvenMonth`, per-token series
 (including the intuition-only straight-line amortized all-in), Token Yield series, melt
-analytics, min viable scale, D_max, tornado (±30% one-at-a-time).
+analytics, first viable scale, D_max, tornado (±30% one-at-a-time).
 
-**Verification** (`node dashboard/verify.mjs`, 23 checks, all machine-precision):
+**Verification** (`node dashboard/verify.mjs`, 47 checks, all machine-precision):
 A. constant world vs exact closed form; B. exponential world vs exact geometric sums;
 C. t* closed form vs bisection; D. glacier value vs independent sum; E. `D_max` identity;
 F. staged ≤ upfront and staged-covers-demand invariants; plus σ-equivalence
-(`σ=0.5 ≡ Q₀/2`).
+(`σ=0.5 ≡ Q₀/2`); H. canonical-spec test vectors; I. provider rate-card blending,
+range, cache and discount invariants; J. provider-path geometric NPV, melt time, and token-basis
+identity. The embedded dashboard engine must also match `dashboard/engine.dev.js` byte-for-byte.
+K is the minimum-scale regression: the true first default crossing is `18,032.95M` tokens/month,
+followed almost immediately by another GPU purchase and a temporary dip below zero; the retired
+global bisection returned a later crossing near `18,049.30M`.
+L verifies that overflow bought on both paths earns no glacier margin and that a zero-price
+comparator remains already melted rather than spuriously “opening later.” M proves the
+breakpoint walk still finds an earlier profitable fleet band when the arbitrary search ceiling
+itself is infeasible after a GPU jump.
 
-## 10. Default parameters (Aug 2026 — sourced; per-bound citations in [calibration-data.md](calibration-data.md))
+## 10. Default parameters (Aug/Sep 2026 — sourced; per-bound citations in [calibration-data.md](calibration-data.md))
 
 | Param | Low | Central | High | Note |
 |---|---|---|---|---|
@@ -294,6 +374,11 @@ F. staged ≤ upfront and staged-covers-demand invariants; plus σ-equivalence
 | `p₀` $/Mtok | 4.00 | **4.25** (workhorse) / 10 (flagship) | 11.25 | frontier blended 3:1; pick tier AND its matching λ |
 | `λ` /yr | 0.2 | **0.462** (18-mo halving, list-price regime) | 1.0 | fixed-capability regime runs λ≈2.3 (10×/yr) — only valid with a fixed-task p₀ |
 | `p_o₀` $/Mtok | 0.23 | **0.30** (commodity) / 2.00 (best-open) | 2.20 | hosted open-weight, per tier |
+| `p_P₀` $/Mtok | 1.400 | **1.633** | 1.757 | same-model provider quote range / equal-weight center at `θ=.25`, `χ=.25`, `d=0` |
+| `λ_P` /yr | 0.2 | **0.462** | 1.0 | provider-price scenario; no historical three-provider fit claimed |
+| `θ` | workload | **0.25** | workload | 3:1 input:output token mix |
+| `χ` | 0 | **0.25** | measured | cached share of input; scenario input, not a sourced population mean |
+| `d` | 0 | **0** | negotiated | public list-rate discount; private contracts are not observable |
 | `κ` | 1.0 | **1.15** | 1.5 | workload-dependent; agentic chains worse |
 | `D` $ | 100k | **250k** | 600k | 1–3 eng × 3–6 mo loaded |
 | `m` $/yr | 240k | **450k** | 2M | ~0.5–1 loaded FTE central; 4–5-eng platform team high |
@@ -309,22 +394,22 @@ Consistent with the companion's s_e ≈ 0.085 at the provider level.
 
 **Scaleup** — 5 B movable tok/mo, g=40%/yr, D=$250k, m=$450k/yr, T=3, r=12%:
 
-| vs Frontier ($4.25/M, 18-mo halving) | vs Hosted open ($0.30/M·κ) |
-|---|---|
-| Gate 1 **PASS**: t* = 13.2 yr | Gate 1 PASS: t* = 3.9 yr |
-| Gate 2 **FAIL**: G = $570k < toll = $1.58M | Gate 2 FAIL: G = $24k ≪ $1.58M |
-| NPV_adv = **−$1.02M** · break-even: never | NPV_adv = −$1.56M |
-| Min viable scale ≈ 18 B tok/mo | no scale suffices |
+| vs Frontier ($4.25/M, 18-mo halving) | vs Inference clouds ($1.633/M·κ) | vs Hosted open ($0.30/M·κ) |
+|---|---|---|
+| Gate 1 **PASS**: t* = 13.2 yr | Gate 1 PASS: t* = 10.1 yr | Gate 1 PASS: t* = 3.9 yr |
+| Gate 2 **FAIL**: G = $570k < toll = $1.58M | Gate 2 FAIL: G = $238k < toll | Gate 2 FAIL: G = $24k ≪ toll |
+| NPV_adv = **−$1.02M** · break-even: never | NPV_adv = **−$1.35M** | NPV_adv = −$1.56M |
+| First viable scale ≈ 18 B tok/mo | ≈ 120 B tok/mo | no scale suffices |
 
 The mid-size trap, exactly: the margin is open for 13 years, and it still can't pay a
 $1.6M toll out of a $21k/month API bill.
 
 **Enterprise** — 50 B movable tok/mo, g=25%/yr, D=$400k, m=$900k/yr:
 
-| vs Frontier | vs Hosted open |
-|---|---|
-| Gate 1 PASS · Gate 2 **PASS**: G = $4.71M > toll = $4.10M | Gate 2 FAIL: G = $203k |
-| NPV_adv = **+$617k** · break-even month 33 · fleet grows to 44 GPUs | NPV_adv = −$3.90M |
+| vs Frontier | vs Inference clouds | vs Hosted open |
+|---|---|---|
+| Gate 1 PASS · Gate 2 **PASS**: G = $4.71M > toll = $4.10M | Gate 2 FAIL: G = $1.97M | Gate 2 FAIL: G = $203k |
+| NPV_adv = **+$617k** · break-even month 33 · fleet grows to 44 GPUs | NPV_adv = **−$2.12M** | NPV_adv = −$3.90M |
 
 Verdict: **it depends** — building beats the frontier API, but *renting the same open
 model* beats building by $3.9M. Self-hosting only wins outright when APIs are off the
@@ -340,10 +425,14 @@ archetypes are run through the engine in [enterprise-examples.md](enterprise-exa
   recommend building slightly too eagerly near the boundary.
 - No defensive-pricing endogeneity: λ is your assumption, but the incumbent moves it in
   response to exactly the migration this model recommends.
+- Public provider rates are a dated same-model snapshot. The provider line excludes batch
+  pricing, priority/flex/US-only tiers, latency and reliability differences, egress, minimum
+  commitments, and private discounts; use `d` only for a discount you can substantiate.
 - Integer-GPU steps make thresholds locally fuzzy (reported ~2 s.f.).
 - No latency/SLA constraints, no data-gravity value, no compliance premium — all of which
   are *reasons to build at negative NPV_adv*, and they belong in the verdict as
   qualitative overrides, not in this arithmetic.
 
-*Analytical work, not investment advice. All defaults are Aug-2026 knowledge-based
-estimates; plug in your own numbers. Figures reproduced by `dashboard/verify.mjs`.*
+*Analytical work, not investment advice. Infrastructure defaults are Aug-2026
+knowledge-based estimates; the provider rate card is a 2026-09-01 primary-source snapshot.
+Plug in your own numbers. Figures reproduced by `dashboard/verify.mjs`.*

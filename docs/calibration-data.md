@@ -1,11 +1,11 @@
-# Calibration data — sourced, August 2026
+# Calibration data — sourced, August 2026 + provider addendum, September 2026
 
 *Produced by a 6-agent web-research sweep + adversarial paper audit (2026-08-28), synthesized
 with per-bound citations. This file is the sourcing behind `docs/glacier-math.md` §10 and the
 engine defaults in `index.html`. Read the provenance caveat before quoting any number.*
 
 ---
-# Calibration data (sourced, August 2026)
+# Calibration data (sourced, August 2026; managed-inference rates refreshed 2026-09-01)
 
 **Provenance caveat (applies to every number below).** All six underlying reports were compiled 2026-08-28 from a sandbox whose egress proxy blocked most primary domains. Only a handful of sources were fetched in full: `platform.claude.com` (Anthropic pricing), NVIDIA TensorRT-LLM perf docs (GitHub), DeepSeek's open-infra inference-system disclosure (GitHub), the dzhsurf DeepSeek benchmark repo, the Azure LLM inference trace dataset, the sglang issue #7452 thread, and Microsoft's FY26 Q4 investor press-release page. Everything else is **snippet-verified, page-unverified** — the source URL is given so a reader can confirm. Numbers marked **†** are inferences/synthesis (arithmetic on sourced figures, or a range constructed by the researcher) rather than direct citations; numbers marked **(unverified)** rest on a single secondary snippet.
 
@@ -34,6 +34,39 @@ engine defaults in `index.html`. Read the provenance caveat before quoting any n
 | **m** — MLOps $/yr | $240,000 † (≈0.5 FTE) | **$400,000–500,000 †** (≈1 fully-loaded engineer) | $2,000,000 (4–5-engineer platform team; companion-paper anchor, not independently checkable) | Sole anchor: audited papers' F = $2M/yr for a routing/eval/hosting/monitoring team of 4–5 engineers (Report 6) → ≈$440K/FTE fully loaded (arithmetic†). Scale reality check: AT&T's cost-driven build runs ~530 GPUs ([AMD Newsroom](https://newsroom.amd.com/news/aai-2026-att-open-telco-update/), snippet), implying multi-FTE ops |
 | **delta** — GPU value decay /yr | 0.15 † (bull) | **0.25–0.30 †** | 0.45–0.50 † (stress) | LOW†: H100 street ~$35K (2023) → used ~$24.5K (2026) ≈ 0.12/yr (computed from [Compute Exchange](https://compute.exchange/blogs/h100-gpu-price-2026), snippet); CENTRAL†: A100 $15K (2021) → $4–7K used (2024–25) ≈ ln(15,000/6,500)/4.75 ≈ 0.18/yr, plus quoted secondary-market depreciation 20–30%/yr ≈ δ 0.22–0.36 ([Hashrate Index](https://hashrateindex.com/blog/used-gpu-market-pricing-deprecation-secondary-ai/), [Alibaba A100 guide](https://electronics.alibaba.com/product/nvidia-a100-80gb-price), snippets); HIGH†: rental-income decay from scarcity peak $8→~$2.2/hr ≈ 0.5/yr ([latent.space "$2 H100s"](https://www.latent.space/p/gpu-bubble), [Silicon Data index](https://www.silicondata.com/blog/h100-rental-price-over-time), snippets); Burry 2–3-yr economic-life thesis vs CoreWeave 6-yr books ([CNBC](https://www.cnbc.com/2025/11/14/ai-gpu-depreciation-coreweave-nvidia-michael-burry.html), snippet) |
 | **sigma** — movable-to-open share | 0.11 (US enterprise production) | **0.20 †** | 0.30–0.45 (developer/routed traffic; top unverified) | LOW: [Menlo 2025 enterprise survey](https://menlovc.com/perspective/2025-the-state-of-generative-ai-in-the-enterprise/) (snippet; and mid-year 13% per [Menlo mid-year update](https://menlovc.com/perspective/2025-mid-year-llm-market-update/)); CENTRAL†: synthesis between the two populations; HIGH: open-weight ≈30% of tokens in the [a16z × OpenRouter 100T-token study](https://a16z.com/state-of-ai/) ([arXiv 2601.10088](https://arxiv.org/abs/2601.10088), snippet); Chinese-origin models >45% of OpenRouter traffic Aug-2026 ([KuCoin recap](https://www.kucoin.com/news/flash/chinese-models-dominate-openrouter-weekly-token-usage-ranking), **unverified precision**) |
+
+## 1.1 Managed-inference provider curve addendum (primary pages fetched 2026-09-01)
+
+The generic `pOpen0` bounds above mix model families and providers. The dashboard's new
+`inferenceCloud` path instead holds the model constant—**DeepSeek V4 Pro 0813**, standard
+serverless tier—and changes only the provider. These are direct public rate-card observations,
+not snippets:
+
+| Provider | Uncached input `I_j` | Cached input `C_j` | Output `O_j` | Primary source |
+|---|---:|---:|---:|---|
+| Fireworks AI | $1.32 | $0.044 | $3.96 | [Fireworks serverless pricing](https://docs.fireworks.ai/serverless/pricing) |
+| Baseten | $1.32 | $0.132 | $3.96 | [Baseten Model API pricing](https://www.baseten.co/pricing/) |
+| DeepInfra | $1.30 | $0.10 | $2.60 | [DeepInfra model page](https://deepinfra.com/deepseek-ai/DeepSeek-V4-Pro-0813) |
+
+All prices are dollars per million open-model tokens. The workload blend is
+
+```
+b_j = (1−d)[(1−θ)((1−χ)I_j + χC_j) + θO_j]
+p_P0 = Σ_j ω_j b_j,  with ω_j = 1/3
+```
+
+At the dashboard defaults `θ=.25` (3:1 input:output), `χ=.25` (25% of input cached), and
+`d=0`, this gives Fireworks `$1.74075`, Baseten `$1.75725`, and DeepInfra `$1.40000` per
+million open tokens; the equal-weight center is **`p_P0=$1.6326667/M`** and the public-quote
+band is **`$1.40000–$1.75725/M`**. With the model's `κ=1.15`, the central reference-quality
+price is **`$1.8775667/M`**. With `χ=0`, the basket is `$1.8616667/M`; therefore the 25%
+cache-hit scenario cuts the blended bill by 12.3%.
+
+`θ`, `χ`, and `d` are workload/contract inputs, not population estimates. The engine defaults
+to no contract discount because private quotes are unobservable. Baseten explicitly advertises
+volume discounts, Fireworks documents separate batch and US-only pricing, and DeepInfra exposes
+priority/flex tiers; none is silently folded into the standard-tier basket. The dashboard shows
+the three-provider range and lets the user change mix, cache, discount, and `λ_P` directly.
 
 **Notes on contested parameters (where reports disagree):**
 
