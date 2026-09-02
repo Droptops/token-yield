@@ -5,7 +5,8 @@ chips, the (falling) price of tokens, the (rising) price of electricity, and the
 of standing up open-source inference — and get a verdict, a break-even month, and the
 melt clock on your savings. The dashboard now separates frontier APIs, commodity hosted
 open weights, and an apples-to-apples managed-inference basket for Fireworks AI, Baseten,
-and DeepInfra.
+and DeepInfra. It also models a personal/local ownership ladder for NVIDIA DGX Spark and
+Apple's announced 2026 M6/M5 Pro Mac mini and M5 Max/M5 Ultra Mac Studio lines.
 
 **[→ Open the dashboard](index.html)** · plug in your numbers, flip between **Plain** and
 **Nerd** mode, watch the two gates decide.
@@ -26,12 +27,13 @@ and DeepInfra.
 
 | File | What it is |
 |---|---|
-| [`index.html`](index.html) | The dashboard. Self-contained, no build step. Plain + Nerd modes, presets, glacier/break-even/token-yield charts, sensitivity tornado. |
+| [`index.html`](index.html) | The dashboard. Self-contained, no build step. Plain + Nerd modes, presets, glacier/break-even/token-yield charts, local-AI ownership ladder, sensitivity tornado. |
 | [`docs/glacier-math.md`](docs/glacier-math.md) | **The nerd version** — full derivations, closed forms, melt time, glacier value, two gates, force vectors, calibration, worked examples. |
 | [`docs/inference-provider-curve.md`](docs/inference-provider-curve.md) | **The provider addendum** — Fireworks AI / Baseten / DeepInfra same-model rate card, input-output-cache blend, quote band, NPV and melt derivations. |
+| [`docs/local-ai-ownership.md`](docs/local-ai-ownership.md) | **The local-AI addendum** — timestamped synthesis of Nate B. Jones's Apple local-AI episode, official DGX Spark/Mac specs, memory-fit gate, bandwidth roofline, electricity, resale, output-basis conversion, and break-even derivation. |
 | [`docs/glacier-math.tex`](docs/glacier-math.tex) | Same, as a LaTeX working paper. |
 | [`docs/glacier-plain.md`](docs/glacier-plain.md) | **The easy version** — the whole model as one glacier story, no equations. |
-| [`dashboard/verify.mjs`](dashboard/verify.mjs) | Verification: extracts the engine from `index.html` and checks it against exact closed forms (47 checks, machine precision, incl. provider-basket arithmetic, first-crossing sawtooth and overflow regressions, engine parity, and cross-checks against the reviewed canonical spec). |
+| [`dashboard/verify.mjs`](dashboard/verify.mjs) | Verification: extracts the engine from `index.html` and checks it against exact closed forms (58 checks, machine precision, incl. provider-basket arithmetic, local ownership/roofline arithmetic, first-crossing sawtooth and overflow regressions, engine parity, and cross-checks against the reviewed canonical spec). |
 | [`docs/calibration-data.md`](docs/calibration-data.md) | **Sourced calibration** — Aug-2026 low/central/high for every parameter plus a primary-source Sep-2026 inference-provider addendum. |
 | [`docs/enterprise-examples.md`](docs/enterprise-examples.md) | **Reproducible enterprise archetypes** (Microsoft Foundry cohort, Salesforce-scale, Klarna-shape, Roblox-shape) run through the engine. |
 | [`docs/paper-audit.md`](docs/paper-audit.md) + [`dashboard/audit-twogates.mjs`](dashboard/audit-twogates.mjs) | Audit of the companion papers: 17/17 claims reproduce; 2 wording defects found and corrected in place. |
@@ -60,6 +62,10 @@ node dashboard/verify.mjs   # ALL CHECKS PASS
 - Managed-inference basket: **$1.633/M open tokens** at a 3:1 input:output mix and 25%
   input-cache hit rate, with a **$1.400–$1.757/M** public-quote range across Fireworks AI,
   Baseten, and DeepInfra for the same DeepSeek V4 Pro 0813 model (Sep 1, 2026 snapshot).
+- Local-AI ladder: **five ownership curves** spanning DGX Spark, two Mac mini chips, and
+  two Mac Studio chips. Curves use starting configurations, reject model footprints that
+  do not fit after memory reserve, and estimate decode throughput from the explicit
+  bandwidth roofline `ηB/W` rather than unverified vendor token claims.
 - Melt time vs the frontier API: **13 years**; vs hosted open-weights: **3.9 years** —
   the fixed toll, not the margin, is what blocks most builds.
 - First viable scale vs the frontier: **≈ 18B movable tokens/month**. Below that, buy;
@@ -69,5 +75,7 @@ node dashboard/verify.mjs   # ALL CHECKS PASS
   utilization or when data can't leave.
 
 *Analytical work, not investment advice. Infrastructure defaults are sourced Aug-2026
-estimates and provider rates are a Sep-1-2026 public snapshot (see
-[calibration-data.md](docs/calibration-data.md)) — the dashboard exists so you can disagree with them.*
+estimates, provider rates are a Sep-1-2026 public snapshot, and local hardware is a
+Sep-2-2026 announcement/retail snapshot (see [calibration-data.md](docs/calibration-data.md)
+and [local-ai-ownership.md](docs/local-ai-ownership.md)) — the dashboard exists so you
+can disagree with them.*

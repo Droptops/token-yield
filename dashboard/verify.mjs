@@ -266,5 +266,43 @@ const check = (name, got, want, tol) => {
   if (!Number.isFinite(q)) fails++;
 }
 
+// ---- Vector N: local-AI ownership ladder metadata, fit gate, roofline,
+// output-token rate-card conversion, and discounted ownership arithmetic.
+{
+  const byKey = Object.fromEntries(G.LOCAL_HARDWARE_PROFILES.map(row => [row.key, row]));
+  check('N DGX Spark public price', byKey.dgxSpark.price, 4699, 0);
+  check('N M6 base memory bandwidth', byKey.macMiniM6.bandwidthGBs, 153, 0);
+  check('N M5 Ultra base memory', byKey.macStudioM5Ultra.memoryGB, 96, 0);
+  check('N M5 Ultra maximum memory ceiling', byKey.macStudioM5Ultra.maxMemoryGB, 512, 0);
+
+  const base = { ...G.DEFAULTS, localModelGB: 12, localMemoryHeadroom: 0.20,
+                 localBandwidthEfficiency: 0.55 };
+  console.log(`${G.localModelFits(byKey.macMiniM6, base) ? 'PASS' : 'FAIL'}  N 12GB model fits M6 starting memory with headroom`);
+  if (!G.localModelFits(byKey.macMiniM6, base)) fails++;
+  console.log(`${!G.localModelFits(byKey.macMiniM6, { ...base, localModelGB: 13 }) ? 'PASS' : 'FAIL'}  N fit gate rejects model above usable M6 memory`);
+  if (G.localModelFits(byKey.macMiniM6, { ...base, localModelGB: 13 })) fails++;
+  check('N M5 Pro roofline throughput', G.localRooflineThroughput(byKey.macMiniM5Pro, base), 0.55 * 307 / 12, 1e-12);
+
+  const oneMonth = { ...base, Tyears: 1 / 12, r: 0, mu: 0, lambdaProvider: 0,
+                     lambdaOpen: 0, kappa: 1.2, providerOutputShare: 0.25 };
+  const cloud = G.localCloudCurves(oneMonth);
+  check('N provider price converted to reference output basis', cloud.rows[0].providerLevelizedRef,
+    1.2 * G.providerBasket(oneMonth).blended / 0.25, 1e-12);
+
+  const synthetic = { key: 'synthetic', name: 'Synthetic', maker: 'test', price: 1000,
+                      memoryGB: 32, maxMemoryGB: 32, bandwidthGBs: 100, powerKw: 0.2 };
+  const constant = {
+    ...G.DEFAULTS, Tyears: 1, r: 0, mu: 0, gamma: 0, e0: 0.10, delta: 0,
+    kappa: 1.2, localModelGB: 10, localMemoryHeadroom: 0,
+    localBandwidthEfficiency: 0.5, localActiveHours: 24,
+    localActivePowerShare: 1, localIdlePowerShare: 0,
+  };
+  const own = G.localOwnership(constant, synthetic);
+  check('N synthetic roofline throughput', own.s0, 5, 1e-12);
+  check('N no-depreciation ownership equals electricity floor', own.levelizedRef,
+    constant.kappa * synthetic.powerKw * constant.e0 / (3600 * own.s0) * 1e6, 1e-12);
+  check('N zero depreciation preserves nominal resale', own.rows.at(-1).resale, synthetic.price, 1e-12);
+}
+
 console.log(fails === 0 ? '\nALL CHECKS PASS' : `\n${fails} CHECKS FAILED`);
 process.exit(fails === 0 ? 0 : 1);
