@@ -32,6 +32,19 @@ const GLACIER = (() => {
   ]);
   const PROVIDER_RATE_CARD_AS_OF = '2026-09-01';
 
+  // Public U.S. starting configurations captured 2026-09-02. Apple prices
+  // are base configurations; maxMemoryGB is display-only CTO context and is
+  // not used for fit or pricing. powerKw is an official input ceiling
+  // (Apple maximum continuous power; DGX Spark bundled power supply).
+  const LOCAL_HARDWARE_PROFILES = Object.freeze([
+    Object.freeze({ key: 'dgxSpark', name: 'DGX Spark', maker: 'NVIDIA', price: 4699, memoryGB: 128, maxMemoryGB: 128, bandwidthGBs: 273, powerKw: 0.240 }),
+    Object.freeze({ key: 'macMiniM6', name: 'Mac mini · M6', maker: 'Apple', price: 899, memoryGB: 16, maxMemoryGB: 32, bandwidthGBs: 153, powerKw: 0.155 }),
+    Object.freeze({ key: 'macMiniM5Pro', name: 'Mac mini · M5 Pro', maker: 'Apple', price: 1699, memoryGB: 24, maxMemoryGB: 64, bandwidthGBs: 307, powerKw: 0.155 }),
+    Object.freeze({ key: 'macStudioM5Max', name: 'Mac Studio · M5 Max', maker: 'Apple', price: 2499, memoryGB: 36, maxMemoryGB: 128, bandwidthGBs: 460, powerKw: 0.480 }),
+    Object.freeze({ key: 'macStudioM5Ultra', name: 'Mac Studio · M5 Ultra', maker: 'Apple', price: 5499, memoryGB: 96, maxMemoryGB: 512, bandwidthGBs: 1200, powerKw: 0.480 }),
+  ]);
+  const LOCAL_HARDWARE_AS_OF = '2026-09-02';
+
   const clamp01 = x => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
 
   // theta = output share of all billed tokens; chi = cached share of input.
@@ -102,7 +115,135 @@ const GLACIER = (() => {
     mYr: 450000,      // ongoing MLOps + maintenance ($/yr, ~1 loaded FTE)
     delta: 0.30,      // hardware value decay (/yr; 0.45 = stress branch)
     vRef: 20,         // value realized per reference Mtok ($/Mtok), Token Yield view
+    localModelGB: 12,             // quantized model-weight footprint W (GB)
+    localMemoryHeadroom: 0.20,    // memory reserved for OS, runtime, KV cache
+    localBandwidthEfficiency: 0.55, // realized fraction eta of bandwidth roofline
+    localActiveHours: 8,          // hours/day generating output tokens
+    localActivePowerShare: 0.65,  // active draw as share of input ceiling
+    localIdlePowerShare: 0.08,    // remaining-day draw as share of input ceiling
   };
+
+  // ---- local ownership ------------------------------------------------
+  // For batch-1 autoregressive decode, weights are approximately streamed once
+  // per generated token. The transparent memory-bandwidth roofline is therefore
+  // s_hat = eta * B / W. It is a scenario estimate, not a vendor benchmark.
+  function localModelFits(profile, P) {
+    const W = Number(P.localModelGB);
+    const headroom = clamp01(P.localMemoryHeadroom == null ? 0.20 : P.localMemoryHeadroom);
+    return Number.isFinite(W) && W > 0 && W <= profile.memoryGB * (1 - headroom);
+  }
+
+  function localRooflineThroughput(profile, P) {
+    if (!localModelFits(profile, P)) return 0;
+    const eta = clamp01(P.localBandwidthEfficiency == null ? 0.55 : P.localBandwidthEfficiency);
+    return eta * profile.bandwidthGBs / P.localModelGB;
+  }
+
+  // Cumulative cloud benchmarks on a generated-output-token basis. Public rate
+  // cards are blended across all billed tokens, so divide by output share theta
+  // before comparing them with a decode throughput measured in output tok/s.
+  function localCloudCurves(P) {
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const provider = providerBasket(P);
+    const theta = Math.max(1e-6, provider.outputShare);
+    const rows = [];
+    let pvOutputWeight = 0, pvProvider = 0, pvHosted = 0;
+    for (let i = 0; i < M; i++) {
+      const t = i / 12;
+      const weight = Math.exp((P.mu - P.r) * t);
+      const providerPerOutput = provider.blended * Math.exp(-P.lambdaProvider * t) / theta;
+      const hostedPerOutput = P.pOpen0 * Math.exp(-P.lambdaOpen * t) / theta;
+      pvOutputWeight += weight;
+      pvProvider += weight * providerPerOutput;
+      pvHosted += weight * hostedPerOutput;
+      rows.push({
+        i,
+        t,
+        month: i + 1,
+        providerLevelizedRef: P.kappa * pvProvider / pvOutputWeight,
+        hostedLevelizedRef: P.kappa * pvHosted / pvOutputWeight,
+      });
+    }
+    return { provider, outputShare: theta, rows };
+  }
+
+  // Economic ownership curve after each month: purchase + discounted electricity
+  // minus the discounted resale value available at that month, divided by
+  // discounted reference-equivalent output. Idle electricity is charged for the
+  // portion of each day outside localActiveHours.
+  function localOwnership(P, profile) {
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const hrsPerMonth = HOURS_PER_YEAR / 12;
+    const daysPerMonth = hrsPerMonth / 24;
+    const activeHours = Math.max(0, Math.min(24, Number(P.localActiveHours) || 0));
+    const activeShare = clamp01(P.localActivePowerShare == null ? 0.65 : P.localActivePowerShare);
+    const idleShare = clamp01(P.localIdlePowerShare == null ? 0.08 : P.localIdlePowerShare);
+    const headroom = clamp01(P.localMemoryHeadroom == null ? 0.20 : P.localMemoryHeadroom);
+    const fits = localModelFits(profile, P);
+    const s0 = localRooflineThroughput(profile, P);
+    const cloud = localCloudCurves(P);
+    const theta = cloud.outputShare;
+    const rows = [];
+    let pvOutputM = 0, pvElectricity = 0, pvProvider = 0, pvHosted = 0;
+    let breakEvenProviderMonth = null;
+
+    if (!fits || !(s0 > 0) || !(activeHours > 0)) {
+      return { profile, fits, s0, usableMemoryGB: profile.memoryGB * (1 - headroom),
+               rows, breakEvenProviderMonth, levelizedRef: Infinity, pvCost: Infinity,
+               pvOutputM: 0, pvElectricity: 0 };
+    }
+
+    for (let i = 0; i < M; i++) {
+      const t = i / 12;
+      const age = (i + 1) / 12;
+      const disc = Math.exp(-P.r * t);
+      const throughput = s0 * Math.exp(P.mu * t);
+      const outputM = throughput * 3600 * activeHours * daysPerMonth / 1e6;
+      const energyKwh = profile.powerKw *
+        (activeShare * activeHours + idleShare * (24 - activeHours)) * daysPerMonth;
+      const electricity = energyKwh * P.e0 * Math.exp(P.gamma * t);
+      const providerPerOutput = cloud.provider.blended * Math.exp(-P.lambdaProvider * t) / theta;
+      const hostedPerOutput = P.pOpen0 * Math.exp(-P.lambdaOpen * t) / theta;
+
+      pvOutputM += disc * outputM;
+      pvElectricity += disc * electricity;
+      pvProvider += disc * outputM * providerPerOutput;
+      pvHosted += disc * outputM * hostedPerOutput;
+
+      const resale = profile.price * Math.exp(-P.delta * age);
+      const resalePV = resale * Math.exp(-P.r * age);
+      const pvCost = profile.price + pvElectricity - resalePV;
+      const levelizedRef = P.kappa * pvCost / pvOutputM;
+      const providerLevelizedRef = P.kappa * pvProvider / pvOutputM;
+      const hostedLevelizedRef = P.kappa * pvHosted / pvOutputM;
+      if (breakEvenProviderMonth === null && pvProvider >= pvCost) breakEvenProviderMonth = i + 1;
+
+      rows.push({
+        i, t, month: i + 1, throughput, outputM, electricity, energyKwh,
+        resale, resalePV, pvCost, pvOutputM,
+        levelizedRef, providerLevelizedRef, hostedLevelizedRef,
+      });
+    }
+
+    const last = rows[rows.length - 1];
+    return {
+      profile, fits, s0,
+      usableMemoryGB: profile.memoryGB * (1 - headroom),
+      rows, breakEvenProviderMonth,
+      levelizedRef: last.levelizedRef,
+      pvCost: last.pvCost,
+      pvOutputM: last.pvOutputM,
+      pvElectricity,
+    };
+  }
+
+  function localOwnershipLadder(P) {
+    return {
+      asOf: LOCAL_HARDWARE_AS_OF,
+      cloud: localCloudCurves(P),
+      profiles: LOCAL_HARDWARE_PROFILES.map(profile => localOwnership(P, profile)),
+    };
+  }
 
   // ---- core simulation -------------------------------------------------
   function simulate(P) {
@@ -452,7 +593,10 @@ const GLACIER = (() => {
   }
 
   return { DEFAULTS, PROVIDER_RATE_CARD, PROVIDER_RATE_CARD_AS_OF,
+           LOCAL_HARDWARE_PROFILES, LOCAL_HARDWARE_AS_OF,
            providerBasket, providerPriceAt, comparatorMeltRate,
+           localModelFits, localRooflineThroughput, localCloudCurves,
+           localOwnership, localOwnershipLadder,
            simulate, epsilon0, meltTime, glacierValue,
            minViableScale, maxDevCost, elecShare, tornado,
            SECONDS_PER_YEAR, HOURS_PER_YEAR };

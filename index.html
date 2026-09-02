@@ -22,6 +22,11 @@
     --s-frontier: #eb6834;    /* frontier API = the sun */
     --s-open: #1baf7a;        /* hosted open-weights */
     --s-provider: #8757c7;    /* managed inference provider basket */
+    --s-dgx: #639A00;
+    --s-mini-m6: #3979B8;
+    --s-mini-pro: #138A8A;
+    --s-studio-max: #D66A00;
+    --s-studio-ultra: #C33C66;
     /* status (fixed) */
     --st-good: #0ca30c; --st-good-text: #006300;
     --st-warn: #fab219; --st-serious: #ec835a; --st-critical: #d03b3b;
@@ -45,6 +50,11 @@
       --s-frontier: #d95926;
       --s-open: #199e70;
       --s-provider: #a77ae8;
+      --s-dgx: #8CCB20;
+      --s-mini-m6: #68A5E3;
+      --s-mini-pro: #38BDBD;
+      --s-studio-max: #F29A42;
+      --s-studio-ultra: #E66B91;
       --st-good-text: #0ca30c;
       --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
     }
@@ -66,6 +76,11 @@
     --s-frontier: #d95926;
     --s-open: #199e70;
     --s-provider: #a77ae8;
+    --s-dgx: #8CCB20;
+    --s-mini-m6: #68A5E3;
+    --s-mini-pro: #38BDBD;
+    --s-studio-max: #F29A42;
+    --s-studio-ultra: #E66B91;
     --st-good-text: #0ca30c;
     --shadow: 0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.28);
   }
@@ -216,6 +231,12 @@
   .eq sub, .eq sup { font-size: 10px; }
   .plain-note { color: var(--ink-2); font-size: 13.5px; margin-top: 10px; }
   body[data-mode="nerd"] .plain-note { display: none; }
+  .local-callout {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--ink-2); font-size: 13px; margin-top: 12px; padding: 10px 14px;
+  }
+  .local-callout b { color: var(--ink); }
+  .local-callout a { color: var(--accent); }
 
   .data-table { display: none; overflow-x: auto; margin-top: 12px; }
   .data-table.open { display: block; }
@@ -319,6 +340,17 @@
       </div>
 
       <div class="ctl-group">
+        <h3>Local AI ownership</h3>
+        <p class="ctl-note">Shared assumptions for DGX Spark and the 2026 Mac desktop ladder.</p>
+        <div class="ctl"><label for="in-localModelGB">Model weights, GB <span class="sym">W</span></label><input id="in-localModelGB" type="number" min="1" step="any" value="12"></div>
+        <div class="ctl"><label for="in-localActiveHours">Generate hours/day <span class="sym">a</span></label><input id="in-localActiveHours" type="number" min="0.1" max="24" step="any" value="8"></div>
+        <div class="ctl nerd-only"><label for="in-localMemoryHeadroom">Memory reserve % <span class="sym">ρ</span></label><input id="in-localMemoryHeadroom" type="number" min="0" max="95" step="any" value="20"></div>
+        <div class="ctl nerd-only"><label for="in-localBandwidthEfficiency">Bandwidth realized % <span class="sym">η</span></label><input id="in-localBandwidthEfficiency" type="number" min="1" max="100" step="any" value="55"></div>
+        <div class="ctl nerd-only"><label for="in-localActivePowerShare">Active nameplate % <span class="sym">ℓ</span></label><input id="in-localActivePowerShare" type="number" min="0" max="100" step="any" value="65"></div>
+        <div class="ctl nerd-only"><label for="in-localIdlePowerShare">Idle nameplate % <span class="sym">ζ</span></label><input id="in-localIdlePowerShare" type="number" min="0" max="100" step="any" value="8"></div>
+      </div>
+
+      <div class="ctl-group">
         <h3>Electricity</h3>
         <div class="ctl"><label for="in-e0">Price $/kWh <span class="sym">e₀</span></label><input id="in-e0" type="number" min="0" step="any" value="0.11"></div>
         <div class="ctl"><label for="in-gamma">Escalation %/yr <span class="sym">γ</span></label><input id="in-gamma" type="number" step="any" value="6"></div>
@@ -379,6 +411,21 @@
         <p class="ctl-note">The center line is an equal-weight basket. The purple band is the cheapest-to-most-expensive public quote under the same input/output/cache mix. Contract discount is an explicit scenario input because negotiated rates are not public.</p>
       </div>
 
+      <div class="card" id="local-ownership-card">
+        <header>
+          <h2>Local AI ownership ladder</h2>
+          <span class="sub">DGX Spark + new Mac mini and Mac Studio starting configurations</span>
+          <button class="tbl-toggle" data-table="t-local" aria-pressed="false">table</button>
+        </header>
+        <div class="chart-box" id="chart-local"></div>
+        <div class="legend" id="legend-local"></div>
+        <div class="data-table" id="t-local"></div>
+        <p class="ctl-note" id="local-fit-note"></p>
+        <p class="plain-note">Each line spreads purchase cost, electricity, and resale value across the output the machine can generate. A line disappears when the model plus memory reserve does not fit that starting configuration. These are auditable scenario curves, not vendor token benchmarks.</p>
+        <div class="eq-strip nerd-only"><span class="eq" id="eq-local"></span></div>
+        <div class="local-callout"><b>Video thesis, modeled:</b> own useful local intelligence for recurring work, then route the hardest jobs to frontier systems. The new Mac line forms a memory ladder; DGX Spark is the CUDA-native alternative. See the <a href="docs/local-ai-ownership.md">timestamped transcript synthesis, assumptions, and full derivation</a>.</div>
+      </div>
+
       <div class="card">
         <header>
           <h2>Race to break even</h2>
@@ -418,7 +465,8 @@
         Deterministic model, month-start convention, continuous rates. Full derivations:
         <a href="docs/glacier-math.md">nerd version</a> ·
         <a href="docs/glacier-plain.md">plain version</a> ·
-        <a href="docs/inference-provider-curve.md">provider curve</a>.
+        <a href="docs/inference-provider-curve.md">provider curve</a> ·
+        <a href="docs/local-ai-ownership.md">local AI ownership</a>.
         Companion pieces: <a href="https://claude.ai/code/artifact/aaa96ee8-841e-450f-90a1-52865e584372">Two Gates and a Half-Life</a> ·
         <a href="https://claude.ai/code/artifact/40c001e6-97f2-4796-bf2f-a538cfdf8142">When Open Source Gets Cheap Enough</a> ·
         <a href="https://claude.ai/code/artifact/569e7a6d-2292-4403-90e8-c522772700af">Melt Rate</a> (sector model).
@@ -462,6 +510,19 @@ const GLACIER = (() => {
     Object.freeze({ key: 'deepinfra', name: 'DeepInfra', model: 'DeepSeek V4 Pro 0813', input: 1.30, cachedInput: 0.10, output: 2.60, weight: 1 / 3 }),
   ]);
   const PROVIDER_RATE_CARD_AS_OF = '2026-09-01';
+
+  // Public U.S. starting configurations captured 2026-09-02. Apple prices
+  // are base configurations; maxMemoryGB is display-only CTO context and is
+  // not used for fit or pricing. powerKw is an official input ceiling
+  // (Apple maximum continuous power; DGX Spark bundled power supply).
+  const LOCAL_HARDWARE_PROFILES = Object.freeze([
+    Object.freeze({ key: 'dgxSpark', name: 'DGX Spark', maker: 'NVIDIA', price: 4699, memoryGB: 128, maxMemoryGB: 128, bandwidthGBs: 273, powerKw: 0.240 }),
+    Object.freeze({ key: 'macMiniM6', name: 'Mac mini · M6', maker: 'Apple', price: 899, memoryGB: 16, maxMemoryGB: 32, bandwidthGBs: 153, powerKw: 0.155 }),
+    Object.freeze({ key: 'macMiniM5Pro', name: 'Mac mini · M5 Pro', maker: 'Apple', price: 1699, memoryGB: 24, maxMemoryGB: 64, bandwidthGBs: 307, powerKw: 0.155 }),
+    Object.freeze({ key: 'macStudioM5Max', name: 'Mac Studio · M5 Max', maker: 'Apple', price: 2499, memoryGB: 36, maxMemoryGB: 128, bandwidthGBs: 460, powerKw: 0.480 }),
+    Object.freeze({ key: 'macStudioM5Ultra', name: 'Mac Studio · M5 Ultra', maker: 'Apple', price: 5499, memoryGB: 96, maxMemoryGB: 512, bandwidthGBs: 1200, powerKw: 0.480 }),
+  ]);
+  const LOCAL_HARDWARE_AS_OF = '2026-09-02';
 
   const clamp01 = x => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
 
@@ -533,7 +594,135 @@ const GLACIER = (() => {
     mYr: 450000,      // ongoing MLOps + maintenance ($/yr, ~1 loaded FTE)
     delta: 0.30,      // hardware value decay (/yr; 0.45 = stress branch)
     vRef: 20,         // value realized per reference Mtok ($/Mtok), Token Yield view
+    localModelGB: 12,             // quantized model-weight footprint W (GB)
+    localMemoryHeadroom: 0.20,    // memory reserved for OS, runtime, KV cache
+    localBandwidthEfficiency: 0.55, // realized fraction eta of bandwidth roofline
+    localActiveHours: 8,          // hours/day generating output tokens
+    localActivePowerShare: 0.65,  // active draw as share of input ceiling
+    localIdlePowerShare: 0.08,    // remaining-day draw as share of input ceiling
   };
+
+  // ---- local ownership ------------------------------------------------
+  // For batch-1 autoregressive decode, weights are approximately streamed once
+  // per generated token. The transparent memory-bandwidth roofline is therefore
+  // s_hat = eta * B / W. It is a scenario estimate, not a vendor benchmark.
+  function localModelFits(profile, P) {
+    const W = Number(P.localModelGB);
+    const headroom = clamp01(P.localMemoryHeadroom == null ? 0.20 : P.localMemoryHeadroom);
+    return Number.isFinite(W) && W > 0 && W <= profile.memoryGB * (1 - headroom);
+  }
+
+  function localRooflineThroughput(profile, P) {
+    if (!localModelFits(profile, P)) return 0;
+    const eta = clamp01(P.localBandwidthEfficiency == null ? 0.55 : P.localBandwidthEfficiency);
+    return eta * profile.bandwidthGBs / P.localModelGB;
+  }
+
+  // Cumulative cloud benchmarks on a generated-output-token basis. Public rate
+  // cards are blended across all billed tokens, so divide by output share theta
+  // before comparing them with a decode throughput measured in output tok/s.
+  function localCloudCurves(P) {
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const provider = providerBasket(P);
+    const theta = Math.max(1e-6, provider.outputShare);
+    const rows = [];
+    let pvOutputWeight = 0, pvProvider = 0, pvHosted = 0;
+    for (let i = 0; i < M; i++) {
+      const t = i / 12;
+      const weight = Math.exp((P.mu - P.r) * t);
+      const providerPerOutput = provider.blended * Math.exp(-P.lambdaProvider * t) / theta;
+      const hostedPerOutput = P.pOpen0 * Math.exp(-P.lambdaOpen * t) / theta;
+      pvOutputWeight += weight;
+      pvProvider += weight * providerPerOutput;
+      pvHosted += weight * hostedPerOutput;
+      rows.push({
+        i,
+        t,
+        month: i + 1,
+        providerLevelizedRef: P.kappa * pvProvider / pvOutputWeight,
+        hostedLevelizedRef: P.kappa * pvHosted / pvOutputWeight,
+      });
+    }
+    return { provider, outputShare: theta, rows };
+  }
+
+  // Economic ownership curve after each month: purchase + discounted electricity
+  // minus the discounted resale value available at that month, divided by
+  // discounted reference-equivalent output. Idle electricity is charged for the
+  // portion of each day outside localActiveHours.
+  function localOwnership(P, profile) {
+    const M = Math.max(1, Math.round(P.Tyears * 12));
+    const hrsPerMonth = HOURS_PER_YEAR / 12;
+    const daysPerMonth = hrsPerMonth / 24;
+    const activeHours = Math.max(0, Math.min(24, Number(P.localActiveHours) || 0));
+    const activeShare = clamp01(P.localActivePowerShare == null ? 0.65 : P.localActivePowerShare);
+    const idleShare = clamp01(P.localIdlePowerShare == null ? 0.08 : P.localIdlePowerShare);
+    const headroom = clamp01(P.localMemoryHeadroom == null ? 0.20 : P.localMemoryHeadroom);
+    const fits = localModelFits(profile, P);
+    const s0 = localRooflineThroughput(profile, P);
+    const cloud = localCloudCurves(P);
+    const theta = cloud.outputShare;
+    const rows = [];
+    let pvOutputM = 0, pvElectricity = 0, pvProvider = 0, pvHosted = 0;
+    let breakEvenProviderMonth = null;
+
+    if (!fits || !(s0 > 0) || !(activeHours > 0)) {
+      return { profile, fits, s0, usableMemoryGB: profile.memoryGB * (1 - headroom),
+               rows, breakEvenProviderMonth, levelizedRef: Infinity, pvCost: Infinity,
+               pvOutputM: 0, pvElectricity: 0 };
+    }
+
+    for (let i = 0; i < M; i++) {
+      const t = i / 12;
+      const age = (i + 1) / 12;
+      const disc = Math.exp(-P.r * t);
+      const throughput = s0 * Math.exp(P.mu * t);
+      const outputM = throughput * 3600 * activeHours * daysPerMonth / 1e6;
+      const energyKwh = profile.powerKw *
+        (activeShare * activeHours + idleShare * (24 - activeHours)) * daysPerMonth;
+      const electricity = energyKwh * P.e0 * Math.exp(P.gamma * t);
+      const providerPerOutput = cloud.provider.blended * Math.exp(-P.lambdaProvider * t) / theta;
+      const hostedPerOutput = P.pOpen0 * Math.exp(-P.lambdaOpen * t) / theta;
+
+      pvOutputM += disc * outputM;
+      pvElectricity += disc * electricity;
+      pvProvider += disc * outputM * providerPerOutput;
+      pvHosted += disc * outputM * hostedPerOutput;
+
+      const resale = profile.price * Math.exp(-P.delta * age);
+      const resalePV = resale * Math.exp(-P.r * age);
+      const pvCost = profile.price + pvElectricity - resalePV;
+      const levelizedRef = P.kappa * pvCost / pvOutputM;
+      const providerLevelizedRef = P.kappa * pvProvider / pvOutputM;
+      const hostedLevelizedRef = P.kappa * pvHosted / pvOutputM;
+      if (breakEvenProviderMonth === null && pvProvider >= pvCost) breakEvenProviderMonth = i + 1;
+
+      rows.push({
+        i, t, month: i + 1, throughput, outputM, electricity, energyKwh,
+        resale, resalePV, pvCost, pvOutputM,
+        levelizedRef, providerLevelizedRef, hostedLevelizedRef,
+      });
+    }
+
+    const last = rows[rows.length - 1];
+    return {
+      profile, fits, s0,
+      usableMemoryGB: profile.memoryGB * (1 - headroom),
+      rows, breakEvenProviderMonth,
+      levelizedRef: last.levelizedRef,
+      pvCost: last.pvCost,
+      pvOutputM: last.pvOutputM,
+      pvElectricity,
+    };
+  }
+
+  function localOwnershipLadder(P) {
+    return {
+      asOf: LOCAL_HARDWARE_AS_OF,
+      cloud: localCloudCurves(P),
+      profiles: LOCAL_HARDWARE_PROFILES.map(profile => localOwnership(P, profile)),
+    };
+  }
 
   // ---- core simulation -------------------------------------------------
   function simulate(P) {
@@ -883,7 +1072,10 @@ const GLACIER = (() => {
   }
 
   return { DEFAULTS, PROVIDER_RATE_CARD, PROVIDER_RATE_CARD_AS_OF,
+           LOCAL_HARDWARE_PROFILES, LOCAL_HARDWARE_AS_OF,
            providerBasket, providerPriceAt, comparatorMeltRate,
+           localModelFits, localRooflineThroughput, localCloudCurves,
+           localOwnership, localOwnershipLadder,
            simulate, epsilon0, meltTime, glacierValue,
            minViableScale, maxDevCost, elecShare, tornado,
            SECONDS_PER_YEAR, HOURS_PER_YEAR };
@@ -924,6 +1116,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     ['in-N','N',1], ['in-delta','delta',0.01], ['in-e0','e0',1], ['in-gamma','gamma',0.01],
     ['in-wKw','wKw',1], ['in-pue','pue',1], ['in-D','D',1], ['in-mYr','mYr',1],
     ['in-T','Tyears',1], ['in-r','r',0.01], ['in-vRef','vRef',1],
+    ['in-localModelGB','localModelGB',1], ['in-localActiveHours','localActiveHours',1],
+    ['in-localMemoryHeadroom','localMemoryHeadroom',0.01],
+    ['in-localBandwidthEfficiency','localBandwidthEfficiency',0.01],
+    ['in-localActivePowerShare','localActivePowerShare',0.01],
+    ['in-localIdlePowerShare','localIdlePowerShare',0.01],
   ];
 
   // ---------- formatting ----------
@@ -941,6 +1138,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
   const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const COLORS = () => ({
     build: cssVar('--s-build'), frontier: cssVar('--s-frontier'), open: cssVar('--s-open'), provider: cssVar('--s-provider'),
+    dgx: cssVar('--s-dgx'), miniM6: cssVar('--s-mini-m6'), miniPro: cssVar('--s-mini-pro'),
+    studioMax: cssVar('--s-studio-max'), studioUltra: cssVar('--s-studio-ultra'),
     ink: cssVar('--ink'), ink2: cssVar('--ink-2'), muted: cssVar('--muted'),
     grid: cssVar('--grid'), baseline: cssVar('--baseline'), surface: cssVar('--surface'),
     good: cssVar('--st-good'), goodText: cssVar('--st-good-text'),
@@ -967,13 +1166,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
   }
 
   // ---------- generic line chart ----------
-  // series: [{key,name,color,values,width,opacity}]
+  // series: [{key,name,color,values,width,opacity,dash}]
   // bands: [{upper,lower,color,name,opacity}] clipped to upper>lower.
   // cfg.band remains a backwards-compatible shorthand for one band.
   function lineChart(boxId, legendId, cfg) {
     const box = document.getElementById(boxId);
     const C = COLORS();
     const M = cfg.months;
+    const xOffset = cfg.xOffset || 0;
     const W = 760, H = 320, mg = { l: 58, r: 20, t: 16, b: 34 };
     const iw = W - mg.l - mg.r, ih = H - mg.t - mg.b;
     const bands = cfg.bands || (cfg.band ? [cfg.band] : []);
@@ -1002,9 +1202,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     // x axis + ticks
     g += `<line x1="${mg.l}" y1="${mg.t + ih}" x2="${W - mg.r}" y2="${mg.t + ih}" stroke="${C.baseline}" stroke-width="1"/>`;
     for (let i = 0; i < M; i += xtickEvery) {
-      g += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="${C.muted}" font-family="IBM Plex Mono,monospace">${i}</text>`;
+      g += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="${C.muted}" font-family="IBM Plex Mono,monospace">${i + xOffset}</text>`;
     }
-    g += `<text x="${W - mg.r}" y="${H - 12}" text-anchor="end" font-size="10.5" fill="${C.muted}">month</text>`;
+    g += `<text x="${W - mg.r}" y="${H - 12}" text-anchor="end" font-size="10.5" fill="${C.muted}">${cfg.xLabel || 'month'}</text>`;
     g += `<text x="${mg.l}" y="${mg.t - 4}" font-size="11" fill="${C.ink2}">${cfg.yLabel}</text>`;
 
     // bands (provider quote interval and/or selected-comparator glacier)
@@ -1025,7 +1225,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
     // series lines + end dots
     for (const s of cfg.series) {
       const pts = s.values.map((v, i) => (!isFinite(v) || (cfg.log && v <= 0)) ? null : `${x(i)},${y(v)}`).filter(Boolean);
-      g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" stroke-linecap="round" opacity="${s.opacity || 1}"/>`;
+      g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-dasharray="${s.dash || ''}" stroke-linejoin="round" stroke-linecap="round" opacity="${s.opacity || 1}"/>`;
       const lastV = s.values[M - 1];
       if (isFinite(lastV) && (!cfg.log || lastV > 0)) {
         g += `<circle cx="${x(M - 1)}" cy="${y(lastV)}" r="4" fill="${s.color}" stroke="${C.surface}" stroke-width="2"/>`;
@@ -1053,7 +1253,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
         const k = document.createElement('span'); k.className = 'key';
         const sw = document.createElement('span');
         sw.className = s.isFill ? 'swatch-fill' : 'swatch-line';
-        if (s.isFill) sw.style.background = s.color; else sw.style.borderTopColor = s.color;
+        if (s.isFill) sw.style.background = s.color;
+        else { sw.style.borderTopColor = s.color; if (s.dash) sw.style.borderTopStyle = 'dashed'; }
         const nm = document.createElement('span'); nm.textContent = s.name;
         k.append(sw, nm); lg.append(k);
       }
@@ -1067,7 +1268,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
       curI = i;
       const line = xh(); line.setAttribute('x1', x(i)); line.setAttribute('x2', x(i)); line.setAttribute('visibility', 'visible');
       tip.textContent = '';
-      const tt = document.createElement('div'); tt.className = 'tip-t'; tt.textContent = 'month ' + i + '  ·  year ' + (i / 12).toFixed(1);
+      const shownMonth = i + xOffset;
+      const tt = document.createElement('div'); tt.className = 'tip-t'; tt.textContent = 'month ' + shownMonth + '  ·  year ' + (shownMonth / 12).toFixed(1);
       tip.append(tt);
       for (const s of cfg.series) {
         const row = document.createElement('div'); row.className = 'row';
@@ -1302,6 +1504,65 @@ if (typeof module !== 'undefined' && module.exports) module.exports = GLACIER;
       'b<sub>j</sub> = (1−d)[(1−θ)((1−χ)I<sub>j</sub>+χC<sub>j</sub>)+θO<sub>j</sub>]&emsp;&emsp;' +
       'p<sub>P,0</sub> = Σω<sub>j</sub>b<sub>j</sub> = ' + fmtPrice(pb.blended) + '/M open tok&emsp;&emsp;' +
       'c<sub>P</sub>(t) = κp<sub>P,0</sub>e<sup>−λᵖt</sup> = ' + fmtPrice(P.kappa * pb.blended) + '/M ref tok at t=0';
+
+    // ----- local AI ownership ladder -----
+    const local = GLACIER.localOwnershipLadder(P);
+    const localColors = {
+      dgxSpark: C.dgx,
+      macMiniM6: C.miniM6,
+      macMiniM5Pro: C.miniPro,
+      macStudioM5Max: C.studioMax,
+      macStudioM5Ultra: C.studioUltra,
+    };
+    const fitProfiles = local.profiles.filter(row => row.fits && row.rows.length);
+    const localSeries = fitProfiles.map(row => ({
+      key: row.profile.key,
+      name: row.profile.name,
+      color: localColors[row.profile.key],
+      values: row.rows.map(month => month.levelizedRef),
+      width: 2.25,
+    }));
+    localSeries.push(
+      { key: 'localProviderRef', name: 'Inference clouds · cumulative', color: C.provider,
+        values: local.cloud.rows.map(row => row.providerLevelizedRef), width: 1.75, dash: '7 5' },
+      { key: 'localHostedRef', name: 'Hosted open · cumulative', color: C.open,
+        values: local.cloud.rows.map(row => row.hostedLevelizedRef), width: 1.75, dash: '3 4' },
+    );
+    lineChart('chart-local', 'legend-local', {
+      months: local.cloud.rows.length,
+      xOffset: 1,
+      xLabel: 'month owned',
+      series: localSeries,
+      fmtY: fmtPrice,
+      yLabel: '$ per 1M reference-quality output tokens · cumulative',
+      log: true,
+    });
+
+    const rejected = local.profiles.filter(row => !row.fits).map(row => row.profile.name);
+    $('#local-fit-note').textContent =
+      'Hardware snapshot ' + local.asOf + '. Fit uses a ' + (P.localMemoryHeadroom * 100).toFixed(0) +
+      '% memory reserve against starting memory; configure-to-order maxima are shown but not used for fit or pricing. ' +
+      (rejected.length ? 'No curve at ' + P.localModelGB + 'GB for: ' + rejected.join(', ') + '.' : 'All starting configurations fit the selected model footprint.');
+
+    const horizonLabel = P.Tyears + 'yr cost $/M';
+    fillTable('t-local',
+      ['hardware', 'fit', 'start price', 'memory start / max', 'bandwidth', 'input ceiling', 'roofline tok/s', 'disc. output', horizonLabel, 'break-even vs clouds'],
+      local.profiles.map(row => [
+        row.profile.name,
+        row.fits ? 'fits' : 'does not fit',
+        fmtUSD(row.profile.price),
+        row.profile.memoryGB + ' / ' + row.profile.maxMemoryGB + 'GB',
+        row.profile.bandwidthGBs >= 1000 ? (row.profile.bandwidthGBs / 1000).toFixed(1) + 'TB/s' : row.profile.bandwidthGBs + 'GB/s',
+        Math.round(row.profile.powerKw * 1000) + 'W',
+        row.fits ? row.s0.toFixed(1) : '—',
+        row.fits ? fmtTok(row.pvOutputM) : '—',
+        row.fits ? fmtPrice(row.levelizedRef) : '—',
+        row.fits ? (row.breakEvenProviderMonth === null ? 'not in horizon' : 'month ' + row.breakEvenProviderMonth) : '—',
+      ]));
+    $('#eq-local').innerHTML =
+      'ŝ<sub>j,0</sub> = ηB<sub>j</sub>/W&emsp;&emsp;' +
+      'q<sub>j,i</sub> = ŝ<sub>j,0</sub>e<sup>μtᵢ</sup>·3600·a·days<sub>mo</sub>/10⁶&emsp;&emsp;' +
+      'L<sub>j,n</sub> = κ[P<sub>j</sub> + Σ<sub>i≤n</sub>dᵢE<sub>j,i</sub> − d<sub>n+</sub>P<sub>j</sub>e<sup>−δt<sub>n+</sub></sup>] / Σ<sub>i≤n</sub>dᵢq<sub>j,i</sub>';
 
     // ----- race chart -----
     const beM = sim.breakEvenMonth;
