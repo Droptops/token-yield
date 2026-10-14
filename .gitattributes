@@ -1,0 +1,2 @@
+# Preserve archive byte hashes across platforms, including Windows checkouts.
+research/hmm/archive/* -text

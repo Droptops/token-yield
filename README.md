@@ -24,6 +24,26 @@ Apple desktop hardware.
 
 ## What's here
 
+### Research map
+
+Token Yield includes two distinct research tracks:
+
+- **Glacier infrastructure economics:** the dashboard, sourced assumptions and
+  executable arithmetic checks described below.
+- **Historical enterprise-software panel and HMM research:** an eight-company,
+  ten-quarter exploratory study, now available as a
+  [self-contained research archive](research/hmm/README.md), with frozen inputs,
+  original code, replay instructions and an [evidence index](docs/hmm-validation.md).
+  Numerical replay succeeds, but the archived backtest includes future-return
+  leakage and a Student-t estimation defect. It does **not** establish clean
+  out-of-sample performance or an incremental HMM investment edge.
+
+The later *Deflating Token Yield* analysis is a separate follow-up. Its corrected
+panel and estimation scripts are not included in this archive; its reported
+findings are not independently reproduced by this repository.
+
+### Glacier files
+
 | File | What it is |
 |---|---|
 | [`index.html`](index.html) | The dashboard. Self-contained, no build step. Plain + Nerd modes, presets, glacier/break-even/token-yield charts, local-AI ownership ladder, sensitivity tornado. |
@@ -43,9 +63,9 @@ Apple desktop hardware.
 node dashboard/verify.mjs
 ```
 
-The public repository is the source of truth for the model, assumptions, derivations,
-calibration, and verification. External/private drafting artifacts are intentionally not
-part of the reproducibility chain.
+The public repository contains the Glacier model, assumptions, derivations,
+calibration and verification, plus the historical HMM research replay. Both
+reproduction paths use repository files without external drafting documents.
 
 ## Headline numbers at the August/September-2026 central calibration
 

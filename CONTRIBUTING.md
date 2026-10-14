@@ -12,6 +12,18 @@ node dashboard/verify.mjs
 
 If your change touches the two-gate derivation or a companion-paper claim, also run the relevant audit script under `dashboard/`.
 
+For the historical HMM archive or replay, also run:
+
+```bash
+python -m pip install -r research/hmm/requirements.txt
+python research/hmm/reproduce.py
+```
+
+Keep `research/hmm/archive/` immutable as the historical record. Corrected models
+or datasets belong in a separate version with explicit provenance and validation.
+A successful replay verifies the saved calculations, not the validity of the
+archived backtest. Keep the known limitations visible when citing its results.
+
 ## Data and assumptions
 
 - Prefer primary sources for hardware specifications, power, and provider pricing.

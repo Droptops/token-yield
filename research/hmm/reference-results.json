@@ -1,0 +1,130 @@
+{
+  "status": "historical_calculations_reproduced_known_defects_present",
+  "clean_out_of_sample_validation": false,
+  "archive_hashes_verified": 9,
+  "versions": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scipy": "1.17.0"
+  },
+  "panel_max_absolute_differences": {
+    "total_rev": 0.0,
+    "cost_sub_rev": 0.0,
+    "sub_gm": 0.0,
+    "ai_acv_qrtly": 0.0,
+    "ai_cost_share": 0.0,
+    "token_cogs": 0.0,
+    "token_yield": 0.0,
+    "ai_revenue_share": 0.0
+  },
+  "panel_rows": 80,
+  "names": [
+    "ADBE",
+    "CRM",
+    "CRWD",
+    "DDOG",
+    "MSFT",
+    "NOW",
+    "ORCL",
+    "SNOW"
+  ],
+  "source_confidence_counts": {
+    "E": 41,
+    "D": 24,
+    "S": 15
+  },
+  "prediction_rows": 32,
+  "prediction_max_absolute_differences": {
+    "token_yield": 0.0,
+    "dlog_ty": 0.0,
+    "ntm_alpha": 0.0,
+    "filt_p1_g1": 0.0,
+    "pred_p1_g1": 0.0,
+    "filt_p1_t1": 0.0,
+    "pred_p1_t1": 0.0,
+    "filt_p1_g2": 0.0,
+    "pred_p1_g2": 0.0,
+    "pred_alpha_g1": 0.0,
+    "pred_alpha_t1": 0.0,
+    "pred_alpha_g2": 0.0
+  },
+  "metrics": {
+    "token_yield": {
+      "n": 32,
+      "spearman_ic": -0.06048387096774193,
+      "pooled_long_minus_short": -0.11033542325481968,
+      "pooled_hit_rate": 0.34375
+    },
+    "dlog_ty": {
+      "n": 32,
+      "spearman_ic": 0.6664222873900293,
+      "pooled_long_minus_short": 0.3378286211380319,
+      "pooled_hit_rate": 0.78125
+    },
+    "pred_alpha_g1": {
+      "n": 32,
+      "spearman_ic": 0.629765395894428,
+      "pooled_long_minus_short": 0.36199917765251477,
+      "pooled_hit_rate": 0.78125
+    },
+    "pred_alpha_t1": {
+      "n": 32,
+      "spearman_ic": 0.6118035190615836,
+      "pooled_long_minus_short": 0.3273326645069352,
+      "pooled_hit_rate": 0.71875
+    },
+    "pred_alpha_g2": {
+      "n": 32,
+      "spearman_ic": 0.006231671554252198,
+      "pooled_long_minus_short": 0.010411037587545375,
+      "pooled_hit_rate": 0.46875
+    }
+  },
+  "name_deletion_max_absolute_differences": {
+    "n": 0.0,
+    "dlog_ic": 0.0,
+    "dlog_p": 0.0,
+    "dlog_hr": 0.0,
+    "v1_ic": 0.0,
+    "v1_p": 0.0
+  },
+  "between_name_ic": 0.9761904761904763,
+  "within_name_ic": 0.1502932551319648,
+  "within_name_p_naive": 0.4116232468252986,
+  "label_maturity": [
+    {
+      "cutoff": "2024-09-30",
+      "labels_used": 24,
+      "nominally_matured": 0,
+      "future_labels": 24,
+      "current_cutoff_targets": 8
+    },
+    {
+      "cutoff": "2024-12-31",
+      "labels_used": 32,
+      "nominally_matured": 0,
+      "future_labels": 32,
+      "current_cutoff_targets": 8
+    },
+    {
+      "cutoff": "2025-03-31",
+      "labels_used": 40,
+      "nominally_matured": 8,
+      "future_labels": 32,
+      "current_cutoff_targets": 8
+    },
+    {
+      "cutoff": "2025-06-30",
+      "labels_used": 48,
+      "nominally_matured": 16,
+      "future_labels": 32,
+      "current_cutoff_targets": 8
+    }
+  ],
+  "student_t_counterexample": {
+    "log_likelihood_before_update": -147.63516023464368,
+    "log_likelihood_after_update": -157.31212068173784,
+    "reported_log_likelihood_is_stale": true
+  }
+}
