@@ -22,3 +22,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Python and local research replay outputs
+__pycache__/
+*.py[cod]
+.venv/
+research/hmm/generated/

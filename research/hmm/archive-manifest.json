@@ -1,0 +1,52 @@
+{
+  "snapshot": "May 2026 historical research",
+  "publication_review_date": "2026-10-14",
+  "provenance": "Author-maintained research source files; recovered bytes preserved. The CSVs contain constructed company-level research inputs, not independently certified filings.",
+  "files": [
+    {
+      "name": "07_expand_panel.py",
+      "size_bytes": 7060,
+      "sha256": "2889c927c78c2469e5d1621b2cb043d8891c6155d4e33f57652a4e681e3b39c1"
+    },
+    {
+      "name": "08_pull_returns_v2.py",
+      "size_bytes": 1997,
+      "sha256": "c62b7fcbedd08654a9cf5c4b97525d825c722d3836d137fb67f5476d9491e526"
+    },
+    {
+      "name": "10_expanding_window.py",
+      "size_bytes": 8023,
+      "sha256": "8168fe5690d93751f24d5844be358fa1e4511b59aa74abd4d2c7884666133b60"
+    },
+    {
+      "name": "13_robustness_tests.py",
+      "size_bytes": 8823,
+      "sha256": "a304f1954d90ab96816fea9f0b370f79b3fc0f0bf0b6e24ffd7ed8af691db1ae"
+    },
+    {
+      "name": "hmm.py",
+      "size_bytes": 6196,
+      "sha256": "fa17ec5f25d791620504c610b50afe8bdb9f84377ccd963887f8500c5c86da68"
+    },
+    {
+      "name": "loo_by_name.csv",
+      "size_bytes": 855,
+      "sha256": "c12068100ca38381f5839ac00876e725e291c996e5b4cad5e7d6ddc77f0f0c69"
+    },
+    {
+      "name": "oos_results.csv",
+      "size_bytes": 8352,
+      "sha256": "82d97c02f3304ee816ce67cb97f6ff96f3111a7a3b9966b57549620f7ff46e74"
+    },
+    {
+      "name": "panel_v2.csv",
+      "size_bytes": 7699,
+      "sha256": "b0d680c624b41842fc5e6c49c462121507ecf323673e422d04b920dd0670d848"
+    },
+    {
+      "name": "panel_v2_returns.csv",
+      "size_bytes": 15456,
+      "sha256": "8db364e7187a7ba0e201a804ef117c1495f4b8f53b8019089f770ffb4e554573"
+    }
+  ]
+}

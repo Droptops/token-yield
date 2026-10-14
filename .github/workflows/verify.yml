@@ -17,3 +17,16 @@ jobs:
         with:
           node-version: 22
       - run: node dashboard/verify.mjs
+
+  historical-hmm-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: research/hmm/requirements.txt
+      - run: python -m pip install -r research/hmm/requirements.txt
+      - run: python research/hmm/reproduce.py
